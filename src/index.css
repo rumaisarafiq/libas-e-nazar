@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-charcoal font-body transition-colors duration-300;
+}
+
+.dark body {
+  @apply bg-surface text-[#F1EAE3];
+}
+
+::selection {
+  background-color: #c9a86a;
+  color: #1c1b19;
+}
+
+/* Custom scrollbar for a premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9a86a;
+  border-radius: 999px;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid #c9a86a;
+  outline-offset: 3px;
+}
+/* Tactile press feedback on every interactive element that opts into
+   focus-ring (which is nearly every button/link across the site) — gives
+   a satisfying "give" on click without needing per-component classes. */
+button.focus-ring:not(:disabled),
+a.focus-ring {
+  transition:
+    transform 0.15s ease,
+    background 0.3s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+button.focus-ring:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+/* Premium gold CTA button — deliberately a different, richer gold than the
+   heading/accent gold so buttons read as distinct, tappable surfaces. */
+.btn-gold {
+  background: linear-gradient(90deg, #c79b4e, #d8b36a);
+  transition:
+    background 0.3s ease,
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.btn-gold:hover:not(:disabled) {
+  background: linear-gradient(90deg, #d8b36a, #e5c98b);
+  box-shadow: 0 8px 24px -8px rgba(199, 155, 78, 0.55);
+}
+.btn-gold:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Hide native browser "reveal password" icons (Edge/IE, and Chrome's
+   autofill icon in some configs) so our own theme-aware eye toggle is the
+   only one shown — the native one doesn't adapt to dark mode. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-strong-password-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
