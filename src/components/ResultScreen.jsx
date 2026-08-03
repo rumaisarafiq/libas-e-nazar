@@ -300,7 +300,7 @@ export default function ResultScreen({
               <p className="mt-2 text-sm leading-relaxed text-charcoal/60 dark:text-cream/60">
                 {appliedCoatId === selectedCoat.id
                   ? "Layered onto your photo and included in your cart total."
-                  : "This look is a saved photo, so the coat couldn't be composited in automatically — but it's included in your cart."}
+                  : "This coat couldn't be layered onto the photo automatically — but it's included in your cart."}
               </p>
             </div>
 

@@ -36,6 +36,7 @@ export default function Footer() {
               UNIVERSITY
             </p>
             <ul className="mt-4 space-y-2 text-sm text-charcoal/70 dark:text-cream/70">
+              <li>Bahria University</li>
               <li>Department of Computer Science</li>
               <li>Faculty of Information Technology</li>
             </ul>
@@ -46,9 +47,9 @@ export default function Footer() {
               DEVELOPER TEAM
             </p>
             <ul className="mt-4 space-y-2 text-sm text-charcoal/70 dark:text-cream/70">
-              <li>Team Lead &amp; Full-Stack Developer</li>
-              <li>AI / Computer Vision Engineer</li>
-              <li>UI / UX Designer</li>
+              <li>Frontend &amp; Full-Stack Development</li>
+              <li>AI / Computer Vision Engineering</li>
+              <li>UI / UX Design</li>
             </ul>
           </div>
         </div>
