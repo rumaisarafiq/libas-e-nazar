@@ -1,18 +1,12 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext";
-import { db } from "../firebase/config";
 import { formatPKR } from "../data/garments";
-import { generateInvoicePDF } from "../utils/generateInvoicePDF";
 import PlaceholderArt from "../components/PlaceholderArt";
 
 // Infers a human-readable role (Shirt / Trouser / Coat / ...) from a
-// garment id's prefix, for the Selected Items / invoice breakdown. Falls
-// back to "Item" for anything that doesn't match a known pattern (e.g.
-// future categories) rather than guessing wrong.
-function roleForItem(id = "") {
+// garment id's prefix, for the line-item badges. Falls back to "Item" for
+// anything that doesn't match a known pattern rather than guessing wrong.
+export function roleForItem(id = "") {
   if (/^(shirt-|polo-|sweatshirt-)/.test(id)) return "Shirt";
   if (/^(pants-|cord-)/.test(id)) return "Trouser";
   if (/^(suit-|coat-|wwc-|pc-|wc-)/.test(id)) return "Coat";
@@ -24,131 +18,9 @@ function roleForItem(id = "") {
   return "Item";
 }
 
-function makeOrderId() {
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `LEN-${Date.now().toString().slice(-6)}${rand}`;
-}
-
-// Saves the order to the real "orders" collection in Firestore — this is
-// the actual database write, not a local log. serverTimestamp() records
-// when Firestore received it (more reliable than trusting the browser's
-// clock for the authoritative record — the human-readable date/time on
-// the purchase object itself is still built from the browser clock, which
-// is fine for display purposes).
-async function saveOrderToDatabase(purchase) {
-  await addDoc(collection(db, "orders"), {
-    ...purchase,
-    createdAtServer: serverTimestamp(),
-  });
-}
-
 export default function Cart() {
-  const { items, removeItem, updateQty, clearCart, totals } = useCart();
-  const { user } = useAuth();
-  const [placed, setPlaced] = useState(false);
-  const [lastPurchase, setLastPurchase] = useState(null);
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderError, setOrderError] = useState(null);
-
-  const handleCheckout = async () => {
-    // No payment backend yet — this simulates order placement so the "buy"
-    // flow and its calculations are demonstrable end-to-end. Login is
-    // optional: guests can check out too, we just tag the order with a
-    // name if one is available.
-    //
-    // Builds a formal purchase object — shape matches what a real backend
-    // order-creation endpoint would expect — and writes it to the real
-    // "orders" collection in Firestore.
-    const now = new Date();
-    const purchase = {
-      orderId: makeOrderId(),
-      userName: user?.name || "Guest",
-      userEmail: user?.email || null,
-      userUid: user?.uid || null,
-      items: items.map((i) => ({
-        name: i.name,
-        role: roleForItem(i.id),
-        size: i.size,
-        style: i.style,
-        qty: i.qty,
-        price: i.price,
-      })),
-      subtotal: totals.subtotal,
-      shipping: totals.shipping,
-      tax: totals.tax,
-      grandTotal: totals.total,
-      date: now.toLocaleDateString(),
-      time: now.toLocaleTimeString(),
-      createdAt: now.toISOString(),
-    };
-
-    setIsPlacingOrder(true);
-    setOrderError(null);
-    try {
-      await saveOrderToDatabase(purchase);
-      setLastPurchase(purchase);
-      clearCart();
-      setPlaced(true);
-    } catch (err) {
-      console.error("Failed to save order:", err);
-      setOrderError(
-        "Couldn't reach the database to save your order. Check your connection and try again.",
-      );
-    } finally {
-      setIsPlacingOrder(false);
-    }
-  };
-
-  const handleDownloadInvoice = () => {
-    if (lastPurchase) generateInvoicePDF(lastPurchase);
-  };
-
-  if (placed) {
-    return (
-      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center px-6 pb-16 pt-28 text-center lg:pt-32">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gold/15 text-gold">
-          <svg
-            viewBox="0 0 24 24"
-            className="h-8 w-8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path
-              d="M5 13l4 4L19 7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-        <h1 className="mt-6 font-display text-2xl text-charcoal dark:text-cream">
-          Order placed!
-        </h1>
-        <p className="mt-2 text-sm text-charcoal/60 dark:text-cream/60">
-          Thanks{user?.name ? `, ${user.name}` : ""} — your order{" "}
-          <span className="font-semibold text-gold">
-            {lastPurchase?.orderId}
-          </span>{" "}
-          has been received. This is a demo checkout, so no payment was actually
-          taken.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <button
-            onClick={handleDownloadInvoice}
-            className="focus-ring btn-gold rounded-full px-8 py-3.5 text-sm font-semibold text-charcoal shadow-card"
-          >
-            Download Invoice (PDF)
-          </button>
-          <Link
-            to="/try-on"
-            className="focus-ring rounded-full border border-charcoal/15 px-8 py-3.5 text-sm font-semibold text-charcoal/70 dark:border-white/15 dark:text-cream/70"
-          >
-            Continue Shopping
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const { items, removeItem, updateQty, totals } = useCart();
+  const navigate = useNavigate();
 
   if (items.length === 0) {
     return (
@@ -312,30 +184,11 @@ export default function Cart() {
           </div>
 
           <button
-            onClick={handleCheckout}
-            disabled={isPlacingOrder}
-            className="focus-ring btn-gold mt-7 w-full rounded-full py-4 text-sm font-semibold text-charcoal shadow-card transition-all duration-300 hover:shadow-lift disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => navigate("/checkout")}
+            className="focus-ring btn-gold mt-7 w-full rounded-full py-4 text-sm font-semibold text-charcoal shadow-card transition-all duration-300 hover:shadow-lift"
           >
-            {isPlacingOrder ? "Placing Order..." : "Place Order"}
+            Proceed to Checkout
           </button>
-          {orderError && (
-            <p className="mt-3 text-center text-xs text-red-500">
-              {orderError}
-            </p>
-          )}
-          {!user && (
-            <p className="mt-3 text-center text-[11px] text-charcoal/40 dark:text-cream/40">
-              Checking out as a guest.{" "}
-              <Link
-                to="/login"
-                state={{ from: "/cart" }}
-                className="font-semibold text-gold hover:underline"
-              >
-                Log in
-              </Link>{" "}
-              to save your order history (optional).
-            </p>
-          )}
           <Link
             to="/try-on"
             className="focus-ring mt-3 block w-full rounded-full border border-charcoal/15 py-3.5 text-center text-sm font-semibold text-charcoal/70 transition-colors duration-200 hover:border-charcoal dark:border-white/15 dark:text-cream/70"

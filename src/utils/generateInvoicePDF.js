@@ -28,8 +28,12 @@ export function generateInvoicePDF(purchase) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
-  doc.text(`Order ID: ${purchase.orderId}`, pageWidth - marginX, y + 14, { align: "right" });
-  doc.text(`${purchase.date}  ${purchase.time}`, pageWidth - marginX, y + 26, { align: "right" });
+  doc.text(`Order ID: ${purchase.orderId}`, pageWidth - marginX, y + 14, {
+    align: "right",
+  });
+  doc.text(`${purchase.date}  ${purchase.time}`, pageWidth - marginX, y + 26, {
+    align: "right",
+  });
 
   y += 48;
   doc.setDrawColor(200, 170, 110);
@@ -46,7 +50,32 @@ export function generateInvoicePDF(purchase) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.text(purchase.userName || "Guest", marginX, y);
-  y += 30;
+  y += 15;
+
+  const shipTo = purchase.shipping_details;
+  if (shipTo) {
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    if (shipTo.phone) {
+      doc.text(shipTo.phone, marginX, y);
+      y += 12;
+    }
+    const addressLine = [shipTo.address, shipTo.apartment]
+      .filter(Boolean)
+      .join(", ");
+    if (addressLine) {
+      doc.text(addressLine, marginX, y, { maxWidth: 260 });
+      y += 12;
+    }
+    const cityLine = [shipTo.city, shipTo.postalCode, shipTo.country]
+      .filter(Boolean)
+      .join(", ");
+    if (cityLine) {
+      doc.text(cityLine, marginX, y);
+      y += 12;
+    }
+  }
+  y += 15;
 
   // --- Items table header ---------------------------------------------
   const col = {
@@ -85,7 +114,9 @@ export function generateInvoicePDF(purchase) {
     doc.text(String(line.qty), col.qty, y + 17);
     doc.text(formatPKR(line.price), col.price, y + 17);
     doc.setTextColor(30, 28, 26);
-    doc.text(formatPKR(line.price * line.qty), col.lineTotal, y + 17, { align: "right" });
+    doc.text(formatPKR(line.price * line.qty), col.lineTotal, y + 17, {
+      align: "right",
+    });
     y += rowH;
   });
 
@@ -106,7 +137,10 @@ export function generateInvoicePDF(purchase) {
     y += bold ? 20 : 16;
   };
   printTotalsRow("Subtotal", formatPKR(purchase.subtotal));
-  printTotalsRow("Shipping", purchase.shipping === 0 ? "Free" : formatPKR(purchase.shipping));
+  printTotalsRow(
+    "Shipping",
+    purchase.shipping === 0 ? "Free" : formatPKR(purchase.shipping),
+  );
   printTotalsRow("Tax", formatPKR(purchase.tax));
   y += 4;
   doc.setDrawColor(200, 170, 110);
