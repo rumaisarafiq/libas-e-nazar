@@ -56,6 +56,10 @@ export function generateInvoicePDF(purchase) {
   if (shipTo) {
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
+    if (purchase.userEmail) {
+      doc.text(purchase.userEmail, marginX, y);
+      y += 12;
+    }
     if (shipTo.phone) {
       doc.text(shipTo.phone, marginX, y);
       y += 12;
