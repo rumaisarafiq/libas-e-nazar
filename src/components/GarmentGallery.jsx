@@ -34,7 +34,7 @@ export default function GarmentGallery({
           GARMENT GALLERY
         </p>
         <p className="text-xs text-charcoal/40 dark:text-cream/40">
-          {items.length} items
+          {items.length} item{items.length !== 1 ? "s" : ""}
         </p>
       </div>
 

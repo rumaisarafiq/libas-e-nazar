@@ -47,10 +47,16 @@ function defaultCategory(style) {
 // hold the loading animation on screen for a bit even when there's nothing
 // to actually wait for.
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const MIN_LOADING_MS = 2400;
+const MIN_LOADING_MS = 5000;
 
 export default function TryOn() {
-  const { style } = useWardrobe();
+  const {
+    style,
+    pendingCategory,
+    setPendingCategory,
+    setHasActiveResult,
+    backToGallerySignal,
+  } = useWardrobe();
   const isWestern = style === "western";
 
   const [activeCategory, setActiveCategory] = useState(defaultCategory(style));
@@ -112,21 +118,40 @@ export default function TryOn() {
     if (!isWestern) setSelectedGarment(null);
   };
 
-  const handleSelectGarment = (garment) => {
+  const handleSelectGarment = (garment, categoryOverride) => {
+    const effectiveCategory = categoryOverride || activeCategory;
     if (isWestern) {
-      if (isUpperBodyCategory(activeCategory)) {
-        setOutfitTop(garment);
-        setJustPickedSlot("top");
-      } else if (isLowerBodyCategory(activeCategory)) {
-        setOutfitBottom(garment);
-        setJustPickedSlot("bottom");
+      if (isUpperBodyCategory(effectiveCategory)) {
+        if (outfitTop?.id === garment.id) {
+          setOutfitTop(null);
+        } else {
+          setOutfitTop(garment);
+          setJustPickedSlot("top");
+        }
+      } else if (isLowerBodyCategory(effectiveCategory)) {
+        if (outfitBottom?.id === garment.id) {
+          setOutfitBottom(null);
+        } else {
+          setOutfitBottom(garment);
+          setJustPickedSlot("bottom");
+        }
       }
     } else {
-      setSelectedGarment(garment);
+      setSelectedGarment((prev) => (prev?.id === garment.id ? null : garment));
     }
     setResult(null);
     setError(null);
   };
+
+  // A category word picked from the Navbar's search suggestions (or
+  // Enter) hands off the category id here — switch straight to it, same
+  // as clicking it in the sidebar directly.
+  useEffect(() => {
+    if (!pendingCategory) return;
+    handleStyleCategory(pendingCategory);
+    setPendingCategory(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCategory]);
 
   // Coats aren't part of the browsable gallery — they're picked from the
   // Recommended Coats section instead, one click to select.
@@ -134,6 +159,14 @@ export default function TryOn() {
     setOutfitCoat(coatGarment);
     setResult(null);
     setError(null);
+  };
+
+  // Same idea, but for picking a coat from the "Suggested Coats" grid on
+  // an already-generated result — must NOT clear the result, or it'd
+  // kick the person back to the builder instead of just adding the coat
+  // alongside what they're already looking at.
+  const handleSelectCoatOnResult = (coatGarment) => {
+    setOutfitCoat(coatGarment);
   };
 
   const handleRemoveCoat = () => setOutfitCoat(null);
@@ -347,7 +380,7 @@ export default function TryOn() {
       const preGenerated = getTryOnResult(style, selectedGarment.id);
       if (preGenerated) {
         const angles = getTryOnResultAngles(style, selectedGarment.id);
-        setStageMessage("Rendering virtual try-on...");
+        setStageMessage("Bringing your look to life...");
         const elapsed = Date.now() - startedAt;
         if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
         setResult({ image: preGenerated, jobId: null, angles });
@@ -390,7 +423,7 @@ export default function TryOn() {
           getWesternTryOnResult(DEFAULT_TOP.id, outfitBottom.id);
       }
       if (preGeneratedWestern) {
-        setStageMessage("Rendering virtual try-on...");
+        setStageMessage("Bringing your look to life...");
         const elapsed = Date.now() - startedAt;
         if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
         setResult({ image: preGeneratedWestern, jobId: null });
@@ -421,6 +454,9 @@ export default function TryOn() {
       const data = await pollForResult(jobId, (stage) =>
         setStageMessage(stage),
       );
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
 
       setResult({ image: getDownloadUrl(data.final_as), jobId });
 
@@ -494,14 +530,51 @@ export default function TryOn() {
     setModelVariant(0);
   };
 
-  // Dismiss the result screen and go back to the gallery, but keep the
-  // current garment/size selections so the person can tweak them instead
-  // of starting over from scratch.
+  // Dismiss the result screen, go back to the gallery, AND clear the
+  // clothing selections back to none — used by both the result screen's
+  // "Back" button and the Navbar's cross-wardrobe confirmation. Doesn't
+  // touch size/model variant, since those aren't clothing choices (the
+  // "Reset" button still exists separately for a full reset including
+  // those).
   const handleBackToEdit = () => {
     setResult(null);
     setError(null);
     setAppliedCoatId(null);
+    setSelectedGarment(null);
+    setOutfitTop(null);
+    setOutfitBottom(null);
+    setOutfitCoat(null);
+    setJustPickedSlot(null);
   };
+
+  // "Back" on the result screen now asks first too, same as the Navbar's
+  // cross-wardrobe prompt — leaving a result behind (and now also
+  // clearing the selections) means starting over if they didn't buy it.
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const requestBackToEdit = () => setShowBackConfirm(true);
+  const confirmBackToEdit = () => {
+    setShowBackConfirm(false);
+    handleBackToEdit();
+  };
+
+  // Keep the Navbar informed of whether a result is currently showing —
+  // it needs this to decide whether clicking "Eastern/Western Wear" for
+  // the wardrobe you're already in should ask "go back to the gallery?"
+  useEffect(() => {
+    setHasActiveResult(!!result);
+  }, [result, setHasActiveResult]);
+
+  // The Navbar bumps this after the person confirms leaving their result
+  // — same effect as clicking "Back", just triggered from outside this
+  // page. Skips the very first render (signal starts at 0) so mounting
+  // the page doesn't immediately "go back" to nothing.
+  const isFirstBackSignal = useState(backToGallerySignal)[0];
+  useEffect(() => {
+    if (backToGallerySignal !== isFirstBackSignal) {
+      handleBackToEdit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backToGallerySignal]);
 
   const handleDownload = (imageOverride) => {
     const target = imageOverride || result?.image;
@@ -604,7 +677,7 @@ export default function TryOn() {
           resultAngles={result.angles}
           onDownload={handleDownload}
           onGenerateAgain={handleReset}
-          onBack={handleBackToEdit}
+          onBack={requestBackToEdit}
           coatOptions={result?.jobId ? coatOptions : []}
           onApplyCoat={handleApplyCoat}
           isApplyingCoat={isApplyingCoat}
@@ -612,96 +685,10 @@ export default function TryOn() {
           appliedCoatId={appliedCoatId}
           selectedCoat={outfitCoat}
           onRemoveCoat={handleRemoveCoat}
+          onSelectSuggestedCoat={handleSelectCoatOnResult}
         />
       ) : (
         <>
-          {isWestern && (
-            <div className="mb-6 rounded-2xl border border-gold/20 bg-gold/5 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs font-semibold tracking-widest2 text-charcoal/50 dark:text-cream/50">
-                  SELECTED ITEMS
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => jumpToCategory("shirts")}
-                    className="focus-ring rounded-full border border-charcoal/15 bg-white px-4 py-1.5 text-xs font-semibold text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:bg-white/5 dark:text-cream/70"
-                  >
-                    Choose Top
-                  </button>
-                  <button
-                    onClick={() => jumpToCategory("pants")}
-                    className="focus-ring rounded-full border border-charcoal/15 bg-white px-4 py-1.5 text-xs font-semibold text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:bg-white/5 dark:text-cream/70"
-                  >
-                    Choose Bottom
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {[
-                  {
-                    label: "Shirt",
-                    item: outfitTop,
-                    onRemove: () => setOutfitTop(null),
-                  },
-                  {
-                    label: "Trouser",
-                    item: outfitBottom,
-                    onRemove: () => setOutfitBottom(null),
-                  },
-                  {
-                    label: "Coat",
-                    item: outfitCoat,
-                    onRemove: handleRemoveCoat,
-                  },
-                ].map(({ label, item, onRemove }) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between rounded-xl bg-white px-4 py-2.5 dark:bg-white/[0.04]"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                          item
-                            ? "bg-gold/20 text-gold"
-                            : "bg-charcoal/10 text-charcoal/30 dark:bg-white/10 dark:text-cream/30"
-                        }`}
-                      >
-                        {item ? "✓" : "–"}
-                      </span>
-                      <span
-                        className={`text-sm ${
-                          item
-                            ? "font-semibold text-charcoal dark:text-cream"
-                            : "text-charcoal/40 dark:text-cream/40"
-                        }`}
-                      >
-                        {item
-                          ? item.name
-                          : `No ${label.toLowerCase()} selected`}
-                      </span>
-                    </div>
-                    {item && (
-                      <button
-                        onClick={onRemove}
-                        aria-label={`Remove ${label}`}
-                        className="focus-ring flex h-6 w-6 items-center justify-center rounded-full text-charcoal/40 transition-colors duration-200 hover:bg-red-50 hover:text-red-500 dark:text-cream/40 dark:hover:bg-red-500/10"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-3 text-xs text-charcoal/40 dark:text-cream/40">
-                Try on just one piece and the other will show as whatever the
-                model's wearing in that photo — not something you're buying. A
-                coat is entirely optional too.
-              </p>
-            </div>
-          )}
-
           {isWestern && justPickedSlot === "top" && !outfitBottom && (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-charcoal px-5 py-4 text-cream animate-fadeIn dark:bg-white/10">
               <p className="text-sm">
@@ -740,8 +727,10 @@ export default function TryOn() {
             />
             <GarmentGallery
               categoryId={activeCategory}
+              style={style}
               selectedGarmentId={selectedGarmentId}
               onSelectGarment={handleSelectGarment}
+              onSelectCategory={handleStyleCategory}
             />
             <ModelPreview
               className="md:col-span-2 lg:col-span-1"
@@ -828,6 +817,16 @@ export default function TryOn() {
         cancelLabel="Cancel"
         onConfirm={runTryOn}
         onCancel={() => setShowConfirmModal(false)}
+      />
+
+      <ConfirmModal
+        open={showBackConfirm}
+        title="Go back to the gallery?"
+        description="You haven't added this to your cart yet — going back clears your current selections, so you'll need to pick everything again."
+        confirmLabel="Yes, go back"
+        cancelLabel="Stay here"
+        onConfirm={confirmBackToEdit}
+        onCancel={() => setShowBackConfirm(false)}
       />
     </div>
   );

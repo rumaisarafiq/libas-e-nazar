@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { formatPKR } from "../data/garments";
 import {
   getModelImage,
@@ -154,6 +154,12 @@ export default function ModelPreview({
             {formatPKR(selectedGarment.price)}
           </p>
         )}
+        <Link
+          to="/size-guide"
+          className="focus-ring mt-1 inline-block text-xs font-semibold text-gold underline-offset-2 hover:underline"
+        >
+          View model measurements →
+        </Link>
       </div>
 
       <div className="mt-6 space-y-3">

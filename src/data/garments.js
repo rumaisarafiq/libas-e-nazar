@@ -30,6 +30,14 @@ export const CATEGORIES = {
   ],
 };
 
+// Flattened list of every browsable category id for a given style — used
+// by search (which looks across the whole wardrobe, not just whichever
+// category happens to be active).
+export function getAllCategoryIds(style) {
+  if (style === "eastern") return CATEGORIES.eastern.map((c) => c.id);
+  return CATEGORIES.western.flatMap((group) => group.items.map((i) => i.id));
+}
+
 // Coats (Suit Coats / Coats & Jackets / Waistcoats) are intentionally NOT a
 // browsable sidebar category for Western — per spec, they're surfaced via
 // "Recommended Coats" (contextual, based on the picked shirt+pants) instead
@@ -587,18 +595,6 @@ export const GARMENTS = {
       price: 2300,
     },
     {
-      id: "shirt-05",
-      name: "Royal Blue Shirt",
-      image: "/clothes/western/shirts/shirt5.png",
-      price: 4600,
-    },
-    {
-      id: "shirt-03",
-      name: "Pink Casual Shirt",
-      image: "/clothes/western/shirts/shirt3.png",
-      price: 4300,
-    },
-    {
       id: "shirt-04",
       name: "Grey Casual Shirt",
       image: "/clothes/western/shirts/shirt4.png",
@@ -617,10 +613,10 @@ export const GARMENTS = {
       price: 2400,
     },
     {
-      id: "shirt-10",
-      name: "Jet Black Dress Shirt",
-      image: "/clothes/western/shirts/shirt10.png",
-      price: 3400,
+      id: "shirt-03",
+      name: "Pink Casual Shirt",
+      image: "/clothes/western/shirts/shirt3.png",
+      price: 4300,
     },
     {
       id: "shirt-09",
@@ -640,6 +636,18 @@ export const GARMENTS = {
       image: "/clothes/western/shirts/shirt1.png",
       price: 2400,
     },
+    {
+      id: "shirt-05",
+      name: "Royal Blue Shirt",
+      image: "/clothes/western/shirts/shirt5.png",
+      price: 4600,
+    },
+    {
+      id: "shirt-10",
+      name: "Jet Black Dress Shirt",
+      image: "/clothes/western/shirts/shirt10.png",
+      price: 3400,
+    },
   ],
   "polo-shirts": [
     {
@@ -647,6 +655,30 @@ export const GARMENTS = {
       name: "White Polo",
       image: "/clothes/western/polo-shirts/polo1.png",
       price: 3000,
+    },
+    {
+      id: "polo-06",
+      name: "Tan Polo",
+      image: "/clothes/western/polo-shirts/polo6.png",
+      price: 2700,
+    },
+    {
+      id: "polo-10",
+      name: "Navy Blue Polo",
+      image: "/clothes/western/polo-shirts/polo10.png",
+      price: 4300,
+    },
+    {
+      id: "polo-11",
+      name: "Black Polo",
+      image: "/clothes/western/polo-shirts/polo11.png",
+      price: 3400,
+    },
+    {
+      id: "polo-08",
+      name: "Deep Maroon Polo",
+      image: "/clothes/western/polo-shirts/polo8.png",
+      price: 3300,
     },
     {
       id: "polo-02",
@@ -673,21 +705,9 @@ export const GARMENTS = {
       price: 3300,
     },
     {
-      id: "polo-06",
-      name: "Tan Polo",
-      image: "/clothes/western/polo-shirts/polo6.png",
-      price: 2700,
-    },
-    {
       id: "polo-07",
       name: "Royal Blue Polo",
       image: "/clothes/western/polo-shirts/polo7.png",
-      price: 3300,
-    },
-    {
-      id: "polo-08",
-      name: "Deep Maroon Polo",
-      image: "/clothes/western/polo-shirts/polo8.png",
       price: 3300,
     },
     {
@@ -695,18 +715,6 @@ export const GARMENTS = {
       name: "Light Grey Polo",
       image: "/clothes/western/polo-shirts/polo9.png",
       price: 2800,
-    },
-    {
-      id: "polo-10",
-      name: "Navy Blue Polo",
-      image: "/clothes/western/polo-shirts/polo10.png",
-      price: 4300,
-    },
-    {
-      id: "polo-11",
-      name: "Black Polo",
-      image: "/clothes/western/polo-shirts/polo11.png",
-      price: 3400,
     },
   ],
   // Colors were matched to the existing try-on results (sweatshirt-01..05)
@@ -935,54 +943,6 @@ export const GARMENTS = {
   ],
   pants: [
     {
-      id: "pants-01",
-      name: "Maroon Pants",
-      image: "/clothes/western/pants/pant1.png",
-      price: 4400,
-    },
-    {
-      id: "pants-02",
-      name: "Olive Green Pants",
-      image: "/clothes/western/pants/pant2.png",
-      price: 3200,
-    },
-    {
-      id: "pants-03",
-      name: "Brown Pants",
-      image: "/clothes/western/pants/pant3.png",
-      price: 2800,
-    },
-    {
-      id: "pants-04",
-      name: "Grey Pants",
-      image: "/clothes/western/pants/pant4.png",
-      price: 4200,
-    },
-    {
-      id: "pants-05",
-      name: "Tan Pants",
-      image: "/clothes/western/pants/pant5.png",
-      price: 3700,
-    },
-    {
-      id: "pants-06",
-      name: "Camel Pants",
-      image: "/clothes/western/pants/pant6.png",
-      price: 3400,
-    },
-    {
-      id: "pants-07",
-      name: "Pastel Sky Blue Pants",
-      image: "/clothes/western/pants/pant7.png",
-      price: 4200,
-    },
-    {
-      id: "pants-08",
-      name: "Candy Pink Pants",
-      image: "/clothes/western/pants/pant8.png",
-      price: 3600,
-    },
-    {
       id: "pants-09",
       name: "Black Dress Pants",
       image: "/clothes/western/pants/pant9.png",
@@ -999,6 +959,54 @@ export const GARMENTS = {
       name: "Navy Blue Pants",
       image: "/clothes/western/pants/pant11.png",
       price: 2600,
+    },
+    {
+      id: "pants-04",
+      name: "Grey Pants",
+      image: "/clothes/western/pants/pant4.png",
+      price: 4200,
+    },
+    {
+      id: "pants-03",
+      name: "Brown Pants",
+      image: "/clothes/western/pants/pant3.png",
+      price: 2800,
+    },
+    {
+      id: "pants-05",
+      name: "Tan Pants",
+      image: "/clothes/western/pants/pant5.png",
+      price: 3700,
+    },
+    {
+      id: "pants-06",
+      name: "Camel Pants",
+      image: "/clothes/western/pants/pant6.png",
+      price: 3400,
+    },
+    {
+      id: "pants-01",
+      name: "Maroon Pants",
+      image: "/clothes/western/pants/pant1.png",
+      price: 4400,
+    },
+    {
+      id: "pants-02",
+      name: "Olive Green Pants",
+      image: "/clothes/western/pants/pant2.png",
+      price: 3200,
+    },
+    {
+      id: "pants-07",
+      name: "Pastel Sky Blue Pants",
+      image: "/clothes/western/pants/pant7.png",
+      price: 4200,
+    },
+    {
+      id: "pants-08",
+      name: "Candy Pink Pants",
+      image: "/clothes/western/pants/pant8.png",
+      price: 3600,
     },
   ],
   "corduroy-pants": [

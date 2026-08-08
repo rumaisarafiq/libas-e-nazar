@@ -57,6 +57,11 @@ export default {
           "0%": { opacity: 0, transform: "scale(0.92) translateY(8px)" },
           "100%": { opacity: 1, transform: "scale(1) translateY(0)" },
         },
+        hourglassFlip: {
+          "0%, 40%": { transform: "rotate(0deg)" },
+          "50%, 90%": { transform: "rotate(180deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         fadeIn: "fadeIn 0.6s ease-out forwards",
@@ -65,6 +70,7 @@ export default {
         spinSlow: "spinSlow 8s linear infinite",
         scanSweep: "scanSweep 1.8s ease-in-out infinite",
         modalPop: "modalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        hourglassFlip: "hourglassFlip 2.6s ease-in-out infinite",
       },
     },
   },

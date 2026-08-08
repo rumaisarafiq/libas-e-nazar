@@ -59,6 +59,7 @@
 
 const SHIRT_PANT_COMBOS = {
   "shirt-01": range11("shirt-01"),
+  "shirt-02": range11("shirt-02"),
   "shirt-03": range11("shirt-03"),
   "shirt-04": range11("shirt-04"),
   "shirt-06": range11("shirt-06"),
