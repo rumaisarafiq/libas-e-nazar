@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Hero from "../components/Hero";
 import PlaceholderArt from "../components/PlaceholderArt";
@@ -47,69 +48,179 @@ const COLLECTIONS = [
 // rendered in Tripo Studio's wireframe/x-ray view instead of solid
 // shading). All loop continuously, muted, like the rest of the site's
 // video previews.
-const MODELS_3D = [
-  {
-    src: "/models3d/prince-coat-metallic.mp4",
-    label: "Prince Coat",
-    tag: "Metallic",
-  },
-  {
-    src: "/models3d/prince-coat-hologram.mp4",
-    label: "Prince Coat",
-    tag: "Hologram",
-  },
-  {
-    src: "/models3d/shalwar-kameez-metallic.mp4",
-    label: "Shalwar Kameez",
-    tag: "Metallic",
-  },
-  {
-    src: "/models3d/shalwar-kameez-hologram.mp4",
-    label: "Shalwar Kameez",
-    tag: "Hologram",
-  },
-  {
-    src: "/models3d/sherwani-metallic.mp4",
-    label: "Sherwani",
-    tag: "Metallic",
-  },
-  {
-    src: "/models3d/sherwani-hologram.mp4",
-    label: "Sherwani",
-    tag: "Hologram",
-  },
-  {
-    src: "/models3d/kurta-pajama-metallic.mp4",
-    label: "Kurta Pajama & Kurta",
-    tag: "Metallic",
-  },
-  {
-    src: "/models3d/kurta-pajama-hologram.mp4",
-    label: "Kurta Pajama & Kurta",
-    tag: "Hologram",
-  },
-  { src: "/models3d/shirts.mp4", label: "Shirt + Pants", tag: "Western" },
-  { src: "/models3d/polo.mp4", label: "Polo + Pants", tag: "Western" },
-  {
-    src: "/models3d/sweatshirt.mp4",
-    label: "Sweatshirt + Pants",
-    tag: "Western",
-  },
-  {
-    src: "/models3d/holo-shirt.mp4",
-    label: "Shirt + Pants",
-    tag: "Hologram",
-  },
-  { src: "/models3d/holo-polo.mp4", label: "Polo + Pants", tag: "Hologram" },
-  {
-    src: "/models3d/holo-sweatshirt.mp4",
-    label: "Sweatshirt + Pants",
-    tag: "Hologram",
-  },
+// NOTE: the 8 metallic/hologram Eastern files below (prince-coat-metallic.mp4
+// etc.) have never actually been uploaded to this project — only described
+// as a text file listing. They will NOT play until the real .mp4 files are
+// placed at these exact paths in public/models3d/. This is the same issue
+// flagged before; including these paths again as requested, but nothing
+// will render here until those files genuinely exist.
+// Pashmina Shawl has no 3D video at all, so it's omitted here — everything
+// else follows the requested category order. "Kurta" and "Kurta Pajama"
+// share the same source file (only one was ever generated covering both),
+// shown under both labels since there's no separate asset for each.
+const METALLIC_MODELS = [
+  { src: "/models3d/kurta-pajama-metallic.mp4", label: "Kurta" },
+  { src: "/models3d/shalwar-kameez-metallic.mp4", label: "Shalwar Kameez" },
+  { src: "/models3d/kurta-pajama-metallic.mp4", label: "Kurta Pajama" },
+  { src: "/models3d/sherwani-metallic.mp4", label: "Sherwani" },
+  { src: "/models3d/prince-coat-metallic.mp4", label: "Prince Coat" },
+  { src: "/models3d/shirts.mp4", label: "Shirts" },
+  { src: "/models3d/polo.mp4", label: "Polo Shirts" },
+  { src: "/models3d/sweatshirt.mp4", label: "Sweatshirts" },
+  { src: "/models3d/shirts.mp4", label: "Pants" },
 ];
+
+const HOLOGRAM_MODELS = [
+  { src: "/models3d/kurta-pajama-hologram.mp4", label: "Kurta" },
+  { src: "/models3d/shalwar-kameez-hologram.mp4", label: "Shalwar Kameez" },
+  { src: "/models3d/kurta-pajama-hologram.mp4", label: "Kurta Pajama" },
+  { src: "/models3d/sherwani-hologram.mp4", label: "Sherwani" },
+  { src: "/models3d/prince-coat-hologram.mp4", label: "Prince Coat" },
+  { src: "/models3d/holo-shirt.mp4", label: "Shirts" },
+  { src: "/models3d/holo-polo.mp4", label: "Polo Shirts" },
+  { src: "/models3d/holo-sweatshirt.mp4", label: "Sweatshirts" },
+  { src: "/models3d/holo-shirt.mp4", label: "Pants" },
+];
+
+function Model3DRow({ title, blurb, models, scrollRef, onScroll }) {
+  return (
+    <div className="py-6">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 px-4 lg:px-8">
+        <div className="max-w-xl">
+          <h3 className="font-display text-2xl text-charcoal dark:text-cream">
+            {title}
+          </h3>
+          <p className="mt-1.5 text-sm text-charcoal/60 dark:text-cream/60">
+            {blurb}
+          </p>
+        </div>
+        <div className="hidden gap-2 sm:flex">
+          <button
+            onClick={() => onScroll(-1)}
+            aria-label="Previous"
+            className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/15 text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:text-cream/70"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                d="M15 18l-6-6 6-6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => onScroll(1)}
+            aria-label="Next"
+            className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/15 text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:text-cream/70"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                d="M9 18l6-6-6-6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-[linear-gradient(90deg,var(--tw-gradient-stops))] from-cream to-transparent dark:from-surface sm:w-16" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-[linear-gradient(270deg,var(--tw-gradient-stops))] from-cream to-transparent dark:from-surface sm:w-16" />
+
+        <div
+          ref={scrollRef}
+          className="flex gap-6 overflow-x-auto scroll-smooth px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
+        >
+          {models.map((m, i) => (
+            <div
+              key={`${m.src}-${m.label}-${i}`}
+              className="w-64 shrink-0 snap-start overflow-hidden rounded-2xl bg-black shadow-soft sm:w-72"
+            >
+              <div className="relative aspect-square w-full">
+                <video
+                  src={m.src}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              </div>
+              <p className="px-4 py-3 text-sm font-medium text-cream">
+                {m.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex justify-center gap-2 px-4 sm:hidden">
+        <button
+          onClick={() => onScroll(-1)}
+          aria-label="Previous"
+          className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/15 text-charcoal/70 dark:border-white/15 dark:text-cream/70"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              d="M15 18l-6-6 6-6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <button
+          onClick={() => onScroll(1)}
+          aria-label="Next"
+          className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/15 text-charcoal/70 dark:border-white/15 dark:text-cream/70"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              d="M9 18l6-6-6-6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const navigate = useNavigate();
+  const metallicGalleryRef = useRef(null);
+  const hologramGalleryRef = useRef(null);
+  const scrollGallery = (ref, direction) => {
+    const el = ref.current;
+    if (!el) return;
+    const cardWidth = el.firstElementChild?.offsetWidth || 224;
+    el.scrollBy({ left: direction * (cardWidth + 24), behavior: "smooth" });
+  };
 
   return (
     <div>
@@ -148,9 +259,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3D Model Gallery */}
-      <section className="mx-auto max-w-[1600px] px-4 py-8 lg:px-8">
-        <div className="mb-10 text-center">
+      {/* 3D Model Gallery — one main heading, two sub-rows: Metallic and Hologram */}
+      <section className="mx-auto max-w-[1600px] py-8">
+        <div className="mb-6 px-4 text-center lg:px-8">
           <p className="text-xs font-semibold tracking-widest2 text-gold">
             INTERACTIVE 3D
           </p>
@@ -158,31 +269,21 @@ export default function Home() {
             Explore in 3D
           </h2>
         </div>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
-          {MODELS_3D.map((m) => (
-            <div
-              key={m.src}
-              className="group overflow-hidden rounded-2xl bg-black shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-card"
-            >
-              <div className="relative aspect-square w-full">
-                <video
-                  src={m.src}
-                  className="h-full w-full object-cover"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-                <span className="absolute left-3 top-3 rounded-full bg-charcoal/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream">
-                  {m.tag}
-                </span>
-              </div>
-              <p className="px-4 py-3 text-sm font-medium text-cream">
-                {m.label}
-              </p>
-            </div>
-          ))}
-        </div>
+
+        <Model3DRow
+          title="Metallic Finish"
+          blurb="Rich, reflective 3D looks that catch the light on every fold, seam, and stitch — the closest thing to holding the fabric before it's made."
+          models={METALLIC_MODELS}
+          scrollRef={metallicGalleryRef}
+          onScroll={(dir) => scrollGallery(metallicGalleryRef, dir)}
+        />
+        <Model3DRow
+          title="Hologram Mode"
+          blurb="A translucent, futuristic view of every garment in motion — silhouette and structure, stripped down to pure light."
+          models={HOLOGRAM_MODELS}
+          scrollRef={hologramGalleryRef}
+          onScroll={(dir) => scrollGallery(hologramGalleryRef, dir)}
+        />
       </section>
 
       {/* Collections */}

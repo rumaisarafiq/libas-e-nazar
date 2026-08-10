@@ -6,8 +6,7 @@ import {
   hasModelPhoto,
   PHOTO_AVAILABLE_SIZE,
 } from "../data/models";
-import { THREE_D_VIDEOS, filterForGarment } from "../data/threeDVideos";
-import GLBViewer from "./GLBViewer";
+import { THREE_D_VIDEOS } from "../data/threeDVideos";
 import { useWardrobe } from "../context/WardrobeContext";
 import { useCart } from "../context/CartContext";
 import PlaceholderArt from "./PlaceholderArt";
@@ -29,9 +28,6 @@ export default function ModelPreview({
   selectedCoat,
   onRemoveCoat,
   category,
-  glbComboSrc,
-  glbTopColor,
-  glbBottomColor,
 }) {
   const { style } = useWardrobe();
   const { addItem } = useCart();
@@ -58,8 +54,7 @@ export default function ModelPreview({
   const [videoIndex, setVideoIndex] = useState(0);
   const video3D =
     video3DOptions[videoIndex % Math.max(video3DOptions.length, 1)];
-  const videoColorMatch = filterForGarment(category, selectedGarment?.name);
-  const has3D = Boolean(glbComboSrc || video3D);
+  const has3D = Boolean(video3D);
 
   useEffect(() => {
     setVideoIndex(0);
@@ -138,20 +133,12 @@ export default function ModelPreview({
 
       <div className="mt-4 flex gap-3">
         <div className="relative aspect-[3/5] w-full flex-1 overflow-hidden rounded-2xl bg-[#ECE7E0] dark:bg-white/5">
-          {viewMode === "3d" && glbComboSrc && !resultImage ? (
-            <GLBViewer
-              key={glbComboSrc}
-              src={glbComboSrc}
-              topColor={glbTopColor}
-              bottomColor={glbBottomColor}
-              className="h-full w-full"
-            />
-          ) : viewMode === "3d" && video3D && !resultImage ? (
+          {viewMode === "3d" && video3D && !resultImage ? (
             <>
               <video
                 key={video3D}
                 src={video3D}
-                style={{ filter: videoColorMatch.filter }}
+                style={{ filter: "none" }}
                 className="h-full w-full bg-black object-cover transition-[filter] duration-300"
                 autoPlay
                 loop

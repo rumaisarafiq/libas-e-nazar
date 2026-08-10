@@ -44,7 +44,8 @@ export default function TopPickerModal({ open, onSelect, onSkip, onClose }) {
               Choose a Top
             </h3>
             <p className="mt-1 text-sm text-charcoal/60 dark:text-cream/60">
-              Pick a shirt, polo, or sweatshirt to pair with your pants, or skip this step.
+              Pick a shirt, polo, or sweatshirt to pair with your pants, or skip
+              this step.
             </p>
           </div>
           <button

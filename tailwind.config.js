@@ -62,6 +62,10 @@ export default {
           "50%, 90%": { transform: "rotate(180deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
+        marquee: {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         fadeIn: "fadeIn 0.6s ease-out forwards",
@@ -71,6 +75,7 @@ export default {
         scanSweep: "scanSweep 1.8s ease-in-out infinite",
         modalPop: "modalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         hourglassFlip: "hourglassFlip 2.6s ease-in-out infinite",
+        marquee: "marquee 30s linear infinite",
       },
     },
   },

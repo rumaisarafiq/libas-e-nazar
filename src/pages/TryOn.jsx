@@ -864,9 +864,6 @@ export default function TryOn() {
               selectedCoat={outfitCoat}
               onRemoveCoat={handleRemoveCoat}
               category={activeCategory}
-              glbComboSrc={glbComboSrc}
-              glbTopColor={glbTopColor}
-              glbBottomColor={glbBottomColor}
             />
           </div>
         </>
