@@ -2,212 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getModelImage } from "../data/models";
 import { formatPKR, GARMENTS, getCoatCategoryGroups } from "../data/garments";
+import { THREE_D_VIDEOS, filterForGarment } from "../data/threeDVideos";
+import GLBViewer from "./GLBViewer";
 import { useCart } from "../context/CartContext";
 import PlaceholderArt from "./PlaceholderArt";
-
-// 3D showcase videos exist only for these 4 Eastern categories — from the
-// 4 finished Tripo Studio renders. Western wear and Pashmina Shawl have
-// no 3D video at all, so the toggle simply won't appear for those.
-const THREE_D_VIDEOS = {
-  "prince-coat": "/models3d/prince-coat.mp4",
-  kurta: "/models3d/kurta-pajama.mp4",
-  "kurta-pajama": "/models3d/kurta-pajama.mp4",
-  "shalwar-kameez": "/models3d/shalwar-kameez.mp4",
-  sherwani: "/models3d/sherwani.mp4",
-  shirts: "/models3d/shirts.mp4",
-  "polo-shirts": "/models3d/polo.mp4",
-  sweatshirts: "/models3d/sweatshirt.mp4",
-};
-
-// Approximates a colorway via CSS filter on the pre-rendered video, since
-// there's no real 3D mesh to recolor (see the notes on the 3D Preview
-// page for why). Matched against keywords in the garment's own name so
-// the 3D view reflects the actual piece someone picked, automatically.
-// Covers every color word actually used across the 4 categories that
-// have a 3D video (Kurta, Kurta Pajama, Sherwani, Prince Coat, Shalwar
-// Kameez) — an earlier version only covered a handful of colors and
-// silently fell back to "unchanged" for anything else, which looked like
-// the toggle wasn't doing anything for most garments.
-//
-// Worth being upfront about the real limitation here: a CSS filter shifts
-// whatever hue is already in the video — it can't reset to an exact
-// target color. Results will look closer to correct on categories whose
-// base video color is already close to the target (e.g. "Sienna Brown"
-// on the Kurta video, which starts brown) than on a big jump (e.g.
-// "Navy" on the same brown-based video).
-// Each source video has a different native color — Prince Coat is
-// off-white, Kurta Pajama is brown, Shalwar Kameez is light grey,
-// Sherwani is black — so "white" doesn't mean "no filter" the same way
-// for all of them. An earlier version used one universal table and
-// treated "white" as "no filter" everywhere, which meant a white
-// Sherwani (a genuinely black video) just showed black, unmodified.
-// These tables are per-category so "white" actually means "brighten
-// toward white from THIS video's own starting point."
-//
-// Honest limit worth knowing: Sherwani's source is close to true black,
-// and CSS brightness/saturate filters are multiplicative — they can't
-// turn near-zero pixels into white no matter how high you push them.
-// "Pearl White Sherwani" will look like a lightened dark grey here, not
-// genuinely white — that's a hard ceiling of working from video instead
-// of a real recolorable material, not something a better filter fixes.
-const CATEGORY_COLOR_FILTERS = {
-  "prince-coat": [
-    {
-      keywords: ["black", "jet", "charcoal"],
-      filter: "brightness(0.3) saturate(0.3)",
-    },
-    {
-      keywords: ["navy"],
-      filter: "sepia(0.7) hue-rotate(190deg) saturate(4) brightness(0.5)",
-    },
-    {
-      keywords: ["maroon", "wine", "burgundy", "red"],
-      filter: "sepia(0.7) hue-rotate(305deg) saturate(4) brightness(0.55)",
-    },
-    {
-      keywords: ["green", "emerald", "olive"],
-      filter: "sepia(0.7) hue-rotate(75deg) saturate(3) brightness(0.55)",
-    },
-    {
-      keywords: ["white", "pearl", "cream", "ivory", "off-white"],
-      filter: "none",
-    },
-  ],
-  kurta: [
-    { keywords: ["black", "jet"], filter: "brightness(0.28) saturate(0.4)" },
-    {
-      keywords: ["charcoal", "slate", "grey", "gray", "ash"],
-      filter: "sepia(0) saturate(0.15) brightness(0.85)",
-    },
-    {
-      keywords: ["navy", "blue"],
-      filter: "sepia(0.5) hue-rotate(180deg) saturate(3.5) brightness(0.55)",
-    },
-    {
-      keywords: ["maroon", "wine", "burgundy"],
-      filter: "sepia(0.5) hue-rotate(300deg) saturate(3) brightness(0.55)",
-    },
-    {
-      keywords: ["mustard", "gold", "yellow"],
-      filter: "saturate(1.6) brightness(1.05)",
-    },
-    {
-      keywords: ["beige", "sand", "tan", "cream", "off-white", "white"],
-      filter: "saturate(0.6) brightness(1.35)",
-    },
-    { keywords: ["brown", "sienna"], filter: "none" },
-  ],
-  "shalwar-kameez": [
-    { keywords: ["black", "jet"], filter: "brightness(0.32) saturate(0.4)" },
-    {
-      keywords: ["navy", "blue"],
-      filter: "sepia(0.6) hue-rotate(190deg) saturate(3.5) brightness(0.6)",
-    },
-    {
-      keywords: ["maroon", "wine", "burgundy"],
-      filter: "sepia(0.6) hue-rotate(305deg) saturate(3.5) brightness(0.55)",
-    },
-    {
-      keywords: ["green", "emerald", "olive"],
-      filter: "sepia(0.6) hue-rotate(75deg) saturate(3) brightness(0.55)",
-    },
-    {
-      keywords: ["mustard", "gold", "yellow", "rust", "orange"],
-      filter: "sepia(0.7) hue-rotate(20deg) saturate(2.5) brightness(0.9)",
-    },
-    {
-      keywords: ["purple"],
-      filter: "sepia(0.6) hue-rotate(230deg) saturate(3.5) brightness(0.55)",
-    },
-    {
-      keywords: ["beige", "cream", "ivory", "white", "off-white"],
-      filter: "brightness(1.3) saturate(0.4)",
-    },
-    { keywords: ["grey", "gray", "slate"], filter: "none" },
-  ],
-  sherwani: [
-    {
-      keywords: ["navy"],
-      filter: "brightness(0.9) sepia(0.5) hue-rotate(190deg) saturate(3)",
-    },
-    {
-      keywords: ["maroon", "wine", "burgundy", "red"],
-      filter: "brightness(0.9) sepia(0.5) hue-rotate(305deg) saturate(3)",
-    },
-    {
-      keywords: ["green", "emerald", "olive"],
-      filter: "brightness(0.9) sepia(0.5) hue-rotate(75deg) saturate(2.5)",
-    },
-    {
-      keywords: ["gold"],
-      filter: "brightness(1.1) sepia(0.6) saturate(2) hue-rotate(10deg)",
-    },
-    {
-      keywords: ["white", "pearl", "cream", "ivory", "off-white"],
-      filter: "brightness(3) contrast(0.6) saturate(0.15)",
-      approximate: true,
-    },
-    { keywords: ["black"], filter: "none" },
-  ],
-};
-
-// The 3 Western videos are all neutral medium-grey clay renders (no
-// texture/color baked in at all) — actually the best-case source for this
-// trick, since true grey takes a hue-rotate cleanly, unlike the
-// already-colored Eastern videos. One shared table since all 3 share the
-// same starting grey.
-const WESTERN_COLOR_FILTERS = [
-  { keywords: ["black", "jet"], filter: "brightness(0.35) saturate(0.2)" },
-  {
-    keywords: ["charcoal", "heather", "grey", "gray", "slate"],
-    filter: "brightness(0.75) saturate(0.1)",
-  },
-  {
-    keywords: ["navy", "royal", "sky", "blue"],
-    filter: "sepia(0.6) hue-rotate(185deg) saturate(3.5) brightness(0.75)",
-  },
-  {
-    keywords: ["maroon", "wine", "burgundy", "red"],
-    filter: "sepia(0.6) hue-rotate(305deg) saturate(3.5) brightness(0.65)",
-  },
-  {
-    keywords: ["green", "emerald", "mint", "olive"],
-    filter: "sepia(0.6) hue-rotate(75deg) saturate(3) brightness(0.7)",
-  },
-  {
-    keywords: ["pink", "blush"],
-    filter: "sepia(0.5) hue-rotate(300deg) saturate(2.5) brightness(1.1)",
-  },
-  {
-    keywords: ["mustard", "gold", "yellow"],
-    filter: "sepia(0.7) hue-rotate(15deg) saturate(2.5) brightness(0.95)",
-  },
-  {
-    keywords: ["tan", "camel", "beige", "sand"],
-    filter: "sepia(0.5) saturate(1.3) brightness(1)",
-  },
-  {
-    keywords: ["brown", "sienna", "dark brown"],
-    filter: "sepia(0.7) saturate(1.6) brightness(0.7)",
-  },
-  {
-    keywords: ["white", "cream", "ivory", "off-white"],
-    filter: "brightness(1.5) saturate(0.15)",
-  },
-];
-
-function filterForGarment(category, name = "") {
-  const table =
-    CATEGORY_COLOR_FILTERS[category] ||
-    (category === "kurta-pajama" ? CATEGORY_COLOR_FILTERS.kurta : null) ||
-    (["shirts", "polo-shirts", "sweatshirts"].includes(category)
-      ? WESTERN_COLOR_FILTERS
-      : null) ||
-    CATEGORY_COLOR_FILTERS["prince-coat"];
-  const lower = name.toLowerCase();
-  const match = table.find((c) => c.keywords.some((k) => lower.includes(k)));
-  return match || { filter: "none", approximate: false };
-}
 
 export default function ResultScreen({
   garment,
@@ -229,11 +27,23 @@ export default function ResultScreen({
   selectedCoat,
   onRemoveCoat,
   onSelectSuggestedCoat,
+  glbComboSrc,
+  glbTopColor,
+  glbBottomColor,
 }) {
   const [showAfter, setShowAfter] = useState(true);
   const [viewMode, setViewMode] = useState("2d"); // "2d" | "3d"
-  const video3D = THREE_D_VIDEOS[category];
+  const video3DEntry = THREE_D_VIDEOS[category];
+  const video3DOptions = Array.isArray(video3DEntry)
+    ? video3DEntry
+    : video3DEntry
+      ? [video3DEntry]
+      : [];
+  const [videoIndex, setVideoIndex] = useState(0);
+  const video3D =
+    video3DOptions[videoIndex % Math.max(video3DOptions.length, 1)];
   const videoColorMatch = filterForGarment(category, garment?.name);
+  const has3D = Boolean(glbComboSrc || video3D);
   const [imageFailed, setImageFailed] = useState(false);
   const { addItem } = useCart();
   const navigate = useNavigate();
@@ -245,6 +55,9 @@ export default function ResultScreen({
   useEffect(() => {
     setAngleIndex(0);
   }, [resultImage]);
+  useEffect(() => {
+    setVideoIndex(0);
+  }, [category]);
   const currentResultImage = angles[angleIndex % angles.length] || resultImage;
   const cycleAngle = (direction) => {
     if (angles.length < 2) return;
@@ -364,7 +177,7 @@ export default function ResultScreen({
               </button>
             </div>
 
-            {video3D && (
+            {has3D && (
               <div className="flex items-center justify-center gap-1 rounded-full border border-gold/30 bg-gold/5 p-1 text-xs font-semibold">
                 <button
                   onClick={() => setViewMode("2d")}
@@ -391,7 +204,15 @@ export default function ResultScreen({
           </div>
 
           <div className="relative mt-6 aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#ECE7E0] shadow-lift dark:bg-white/5">
-            {viewMode === "3d" && video3D ? (
+            {viewMode === "3d" && glbComboSrc ? (
+              <GLBViewer
+                key={glbComboSrc}
+                src={glbComboSrc}
+                topColor={glbTopColor}
+                bottomColor={glbBottomColor}
+                className="h-full w-full"
+              />
+            ) : viewMode === "3d" && video3D ? (
               <>
                 <video
                   key={video3D}
@@ -403,7 +224,60 @@ export default function ResultScreen({
                   muted
                   playsInline
                 />
-                {videoColorMatch.approximate && (
+                {video3DOptions.length > 1 && (
+                  <>
+                    <button
+                      onClick={() =>
+                        setVideoIndex(
+                          (i) =>
+                            (i - 1 + video3DOptions.length) %
+                            video3DOptions.length,
+                        )
+                      }
+                      aria-label="Previous style"
+                      className="focus-ring absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold dark:bg-charcoal/80 dark:text-cream"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          d="M15 18l-6-6 6-6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() =>
+                        setVideoIndex((i) => (i + 1) % video3DOptions.length)
+                      }
+                      aria-label="Next style"
+                      className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold dark:bg-charcoal/80 dark:text-cream"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          d="M9 18l6-6-6-6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-charcoal/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream dark:bg-white/80 dark:text-charcoal">
+                      Style {videoIndex + 1} of {video3DOptions.length}
+                    </span>
+                  </>
+                )}
+                {videoColorMatch.approximate && video3DOptions.length <= 1 && (
                   <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-charcoal/80 px-3 py-1 text-[10px] font-semibold text-cream dark:bg-white/80 dark:text-charcoal">
                     Closest 3D color approximation
                   </span>

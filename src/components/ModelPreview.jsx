@@ -6,6 +6,8 @@ import {
   hasModelPhoto,
   PHOTO_AVAILABLE_SIZE,
 } from "../data/models";
+import { THREE_D_VIDEOS, filterForGarment } from "../data/threeDVideos";
+import GLBViewer from "./GLBViewer";
 import { useWardrobe } from "../context/WardrobeContext";
 import { useCart } from "../context/CartContext";
 import PlaceholderArt from "./PlaceholderArt";
@@ -26,19 +28,53 @@ export default function ModelPreview({
   className = "",
   selectedCoat,
   onRemoveCoat,
+  category,
+  glbComboSrc,
+  glbTopColor,
+  glbBottomColor,
 }) {
   const { style } = useWardrobe();
   const { addItem } = useCart();
   const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [viewMode, setViewMode] = useState("2d"); // "2d" | "3d"
 
   const baseModelImage = getModelImage(style, size, modelVariant);
   const displayedImage = resultImage || baseModelImage;
 
+  // Prefer the real, live-recolorable GLB when a combo model exists for
+  // what's currently picked — falls back to the video approximation
+  // otherwise (or nothing, if neither is available for this category).
+  // For "pants" (no dedicated pants-only video), THREE_D_VIDEOS gives an
+  // array of options instead of one fixed video — videoIndex cycles
+  // through them.
+  const video3DEntry = THREE_D_VIDEOS[category];
+  const video3DOptions = Array.isArray(video3DEntry)
+    ? video3DEntry
+    : video3DEntry
+      ? [video3DEntry]
+      : [];
+  const [videoIndex, setVideoIndex] = useState(0);
+  const video3D =
+    video3DOptions[videoIndex % Math.max(video3DOptions.length, 1)];
+  const videoColorMatch = filterForGarment(category, selectedGarment?.name);
+  const has3D = Boolean(glbComboSrc || video3D);
+
+  useEffect(() => {
+    setVideoIndex(0);
+  }, [category]);
+
   useEffect(() => {
     setImageFailed(false);
   }, [displayedImage]);
+
+  // If nothing 3D applies anymore (category changed, or a coat/result
+  // takes over the preview), fall back to 2D rather than leaving the
+  // toggle stuck on something that no longer applies.
+  useEffect(() => {
+    if (!has3D) setViewMode("2d");
+  }, [has3D]);
 
   const photoAvailable = hasModelPhoto(style, size);
   const canTryOn =
@@ -73,9 +109,110 @@ export default function ModelPreview({
         MODEL PREVIEW
       </p>
 
+      {has3D && !resultImage && (
+        <div className="mb-3 flex justify-center">
+          <div className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/5 p-1 text-xs font-semibold">
+            <button
+              onClick={() => setViewMode("2d")}
+              className={`w-14 rounded-full py-1.5 transition-colors duration-200 ${
+                viewMode === "2d"
+                  ? "bg-charcoal text-cream dark:bg-cream dark:text-charcoal"
+                  : "text-charcoal/60 dark:text-cream/60"
+              }`}
+            >
+              2D
+            </button>
+            <button
+              onClick={() => setViewMode("3d")}
+              className={`w-14 rounded-full py-1.5 transition-colors duration-200 ${
+                viewMode === "3d"
+                  ? "btn-gold text-charcoal"
+                  : "text-charcoal/60 dark:text-cream/60"
+              }`}
+            >
+              3D
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex gap-3">
         <div className="relative aspect-[3/5] w-full flex-1 overflow-hidden rounded-2xl bg-[#ECE7E0] dark:bg-white/5">
-          {displayedImage && !imageFailed ? (
+          {viewMode === "3d" && glbComboSrc && !resultImage ? (
+            <GLBViewer
+              key={glbComboSrc}
+              src={glbComboSrc}
+              topColor={glbTopColor}
+              bottomColor={glbBottomColor}
+              className="h-full w-full"
+            />
+          ) : viewMode === "3d" && video3D && !resultImage ? (
+            <>
+              <video
+                key={video3D}
+                src={video3D}
+                style={{ filter: videoColorMatch.filter }}
+                className="h-full w-full bg-black object-cover transition-[filter] duration-300"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              {video3DOptions.length > 1 && (
+                <>
+                  <button
+                    onClick={() =>
+                      setVideoIndex(
+                        (i) =>
+                          (i - 1 + video3DOptions.length) %
+                          video3DOptions.length,
+                      )
+                    }
+                    aria-label="Previous style"
+                    className="focus-ring absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        d="M15 18l-6-6 6-6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() =>
+                      setVideoIndex((i) => (i + 1) % video3DOptions.length)
+                    }
+                    aria-label="Next style"
+                    className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        d="M9 18l6-6-6-6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-charcoal/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream">
+                    Style {videoIndex + 1} of {video3DOptions.length}
+                  </span>
+                </>
+              )}
+            </>
+          ) : displayedImage && !imageFailed ? (
             <img
               src={displayedImage}
               alt={

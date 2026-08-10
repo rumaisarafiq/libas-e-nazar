@@ -221,6 +221,7 @@ function UnitToggle({ unit, setUnit }) {
 
 export default function SizeGuide() {
   const [unit, setUnit] = useState("in");
+  const [wardrobeView, setWardrobeView] = useState("western");
   const m = SIZE_CHART.find((s) => s.size === "M");
 
   return (
@@ -283,12 +284,65 @@ export default function SizeGuide() {
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[320px_1fr_300px]">
-          <div className="mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl bg-[#ECE7E0] shadow-lift dark:bg-white/5">
+          <div className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl bg-[#ECE7E0] shadow-lift dark:bg-white/5">
             <img
-              src="/models/m.jpeg"
+              src={
+                wardrobeView === "eastern"
+                  ? "/models/eastern-m.png"
+                  : "/models/m.jpeg"
+              }
               alt="Our fit model"
               className="h-full w-full object-cover"
             />
+            <button
+              onClick={() =>
+                setWardrobeView((v) =>
+                  v === "western" ? "eastern" : "western",
+                )
+              }
+              aria-label="Previous wardrobe"
+              className="focus-ring absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold dark:bg-charcoal/80 dark:text-cream"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  d="M15 18l-6-6 6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() =>
+                setWardrobeView((v) =>
+                  v === "western" ? "eastern" : "western",
+                )
+              }
+              aria-label="Next wardrobe"
+              className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-soft transition-colors duration-200 hover:text-gold dark:bg-charcoal/80 dark:text-cream"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  d="M9 18l6-6-6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <span className="absolute left-3 top-3 rounded-full bg-charcoal/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream dark:bg-white/80 dark:text-charcoal">
+              {wardrobeView === "eastern" ? "Eastern" : "Western"}
+            </span>
           </div>
 
           <div className="flex items-center justify-center rounded-2xl bg-cream/60 p-3 dark:bg-white/[0.02]">

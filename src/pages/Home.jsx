@@ -42,6 +42,72 @@ const COLLECTIONS = [
   },
 ];
 
+// Every 3D model currently available — the 7 finished, fully-textured
+// showcase renders plus the 3 hologram-style ones (same source batch,
+// rendered in Tripo Studio's wireframe/x-ray view instead of solid
+// shading). All loop continuously, muted, like the rest of the site's
+// video previews.
+const MODELS_3D = [
+  {
+    src: "/models3d/prince-coat-metallic.mp4",
+    label: "Prince Coat",
+    tag: "Metallic",
+  },
+  {
+    src: "/models3d/prince-coat-hologram.mp4",
+    label: "Prince Coat",
+    tag: "Hologram",
+  },
+  {
+    src: "/models3d/shalwar-kameez-metallic.mp4",
+    label: "Shalwar Kameez",
+    tag: "Metallic",
+  },
+  {
+    src: "/models3d/shalwar-kameez-hologram.mp4",
+    label: "Shalwar Kameez",
+    tag: "Hologram",
+  },
+  {
+    src: "/models3d/sherwani-metallic.mp4",
+    label: "Sherwani",
+    tag: "Metallic",
+  },
+  {
+    src: "/models3d/sherwani-hologram.mp4",
+    label: "Sherwani",
+    tag: "Hologram",
+  },
+  {
+    src: "/models3d/kurta-pajama-metallic.mp4",
+    label: "Kurta Pajama & Kurta",
+    tag: "Metallic",
+  },
+  {
+    src: "/models3d/kurta-pajama-hologram.mp4",
+    label: "Kurta Pajama & Kurta",
+    tag: "Hologram",
+  },
+  { src: "/models3d/shirts.mp4", label: "Shirt + Pants", tag: "Western" },
+  { src: "/models3d/polo.mp4", label: "Polo + Pants", tag: "Western" },
+  {
+    src: "/models3d/sweatshirt.mp4",
+    label: "Sweatshirt + Pants",
+    tag: "Western",
+  },
+  {
+    src: "/models3d/holo-shirt.mp4",
+    label: "Shirt + Pants",
+    tag: "Hologram",
+  },
+  { src: "/models3d/holo-polo.mp4", label: "Polo + Pants", tag: "Hologram" },
+  {
+    src: "/models3d/holo-sweatshirt.mp4",
+    label: "Sweatshirt + Pants",
+    tag: "Hologram",
+  },
+];
+
 export default function Home() {
   const navigate = useNavigate();
 
@@ -76,6 +142,43 @@ export default function Home() {
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-charcoal/60 dark:text-cream/60">
                 {step.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3D Model Gallery */}
+      <section className="mx-auto max-w-[1600px] px-4 py-8 lg:px-8">
+        <div className="mb-10 text-center">
+          <p className="text-xs font-semibold tracking-widest2 text-gold">
+            INTERACTIVE 3D
+          </p>
+          <h2 className="mt-3 font-display text-3xl text-charcoal dark:text-cream sm:text-4xl">
+            Explore in 3D
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+          {MODELS_3D.map((m) => (
+            <div
+              key={m.src}
+              className="group overflow-hidden rounded-2xl bg-black shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-card"
+            >
+              <div className="relative aspect-square w-full">
+                <video
+                  src={m.src}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+                <span className="absolute left-3 top-3 rounded-full bg-charcoal/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream">
+                  {m.tag}
+                </span>
+              </div>
+              <p className="px-4 py-3 text-sm font-medium text-cream">
+                {m.label}
               </p>
             </div>
           ))}

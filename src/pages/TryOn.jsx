@@ -8,9 +8,10 @@ import {
   getCoatOptions,
   getCoatCategoryGroups,
 } from "../data/garments";
-import { getModelVariants, getModelImage, hasModelPhoto } from "../data/models";
+import { getModelImage, hasModelPhoto } from "../data/models";
 import { getTryOnResult, getTryOnResultAngles } from "../data/tryOnResults";
 import { getWesternTryOnResult } from "../data/westernTryOnResults";
+import { getGLBCombo, colorNameToHex } from "../data/glbModels";
 import CategorySidebar from "../components/CategorySidebar";
 import GarmentGallery from "../components/GarmentGallery";
 import ModelPreview from "../components/ModelPreview";
@@ -179,11 +180,6 @@ export default function TryOn() {
   const handleChangeSize = (s) => {
     setSize(s);
     setModelVariant(0);
-  };
-
-  const handleChangeModel = () => {
-    const variantCount = getModelVariants(style, size).length || 1;
-    setModelVariant((prev) => (prev + 1) % variantCount);
   };
 
   // Effective picks used for generation/preview — falls back to a default
@@ -599,6 +595,31 @@ export default function TryOn() {
     ? [outfitTop, outfitBottom, outfitCoat].filter(Boolean)
     : [selectedGarment, outfitCoat].filter(Boolean);
 
+  // Real, live-recolorable 3D — exists for Western shirt+pants and
+  // polo+pants combos once BOTH pieces are picked together (the model is
+  // a combo, not a standalone top). Some specific shirt+pants pairings
+  // have their own pre-made, already-correctly-colored file — those load
+  // as-is, untouched. Everything else falls back to a generic base model
+  // that gets recolored live to match. Falls back further to the
+  // video-based approximation (threeDVideos.js) when neither applies,
+  // handled inside ModelPreview and ResultScreen themselves.
+  const outfitTopCategory = outfitTop?.id.startsWith("polo")
+    ? "polo-shirts"
+    : outfitTop?.id.startsWith("shirt")
+      ? "shirts"
+      : null;
+  const glbCombo =
+    isWestern && outfitTop && outfitBottom
+      ? getGLBCombo(outfitTopCategory, outfitTop.id, outfitBottom.id)
+      : null;
+  const glbComboSrc = glbCombo?.src || null;
+  const glbTopColor =
+    glbCombo?.needsColor && outfitTop ? colorNameToHex(outfitTop.name) : null;
+  const glbBottomColor =
+    glbCombo?.needsColor && outfitBottom
+      ? colorNameToHex(outfitBottom.name)
+      : null;
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-24 pt-28 lg:px-8 lg:pt-32">
       <div className="mb-10 text-center sm:text-left">
@@ -686,9 +707,99 @@ export default function TryOn() {
           selectedCoat={outfitCoat}
           onRemoveCoat={handleRemoveCoat}
           onSelectSuggestedCoat={handleSelectCoatOnResult}
+          glbComboSrc={glbComboSrc}
+          glbTopColor={glbTopColor}
+          glbBottomColor={glbBottomColor}
         />
       ) : (
         <>
+          {isWestern && (
+            <div className="mb-6 rounded-2xl border border-gold/20 bg-gold/5 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-semibold tracking-widest2 text-charcoal/50 dark:text-cream/50">
+                  SELECTED ITEMS
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => jumpToCategory("shirts")}
+                    className="focus-ring rounded-full border border-charcoal/15 bg-white px-4 py-1.5 text-xs font-semibold text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:bg-white/5 dark:text-cream/70"
+                  >
+                    Choose Top
+                  </button>
+                  <button
+                    onClick={() => jumpToCategory("pants")}
+                    className="focus-ring rounded-full border border-charcoal/15 bg-white px-4 py-1.5 text-xs font-semibold text-charcoal/70 transition-colors duration-200 hover:border-gold hover:text-gold dark:border-white/15 dark:bg-white/5 dark:text-cream/70"
+                  >
+                    Choose Bottom
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {[
+                  {
+                    label: "Shirt",
+                    item: outfitTop,
+                    onRemove: () => setOutfitTop(null),
+                  },
+                  {
+                    label: "Trouser",
+                    item: outfitBottom,
+                    onRemove: () => setOutfitBottom(null),
+                  },
+                  {
+                    label: "Coat",
+                    item: outfitCoat,
+                    onRemove: handleRemoveCoat,
+                  },
+                ].map(({ label, item, onRemove }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between rounded-xl bg-white px-4 py-2.5 dark:bg-white/[0.04]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
+                          item
+                            ? "bg-gold/20 text-gold"
+                            : "bg-charcoal/10 text-charcoal/30 dark:bg-white/10 dark:text-cream/30"
+                        }`}
+                      >
+                        {item ? "✓" : "–"}
+                      </span>
+                      <span
+                        className={`text-sm ${
+                          item
+                            ? "font-semibold text-charcoal dark:text-cream"
+                            : "text-charcoal/40 dark:text-cream/40"
+                        }`}
+                      >
+                        {item
+                          ? item.name
+                          : `No ${label.toLowerCase()} selected`}
+                      </span>
+                    </div>
+                    {item && (
+                      <button
+                        onClick={onRemove}
+                        aria-label={`Remove ${label}`}
+                        className="focus-ring flex h-6 w-6 items-center justify-center rounded-full text-charcoal/40 transition-colors duration-200 hover:bg-red-50 hover:text-red-500 dark:text-cream/40 dark:hover:bg-red-500/10"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-3 text-xs text-charcoal/40 dark:text-cream/40">
+                Try on just one piece and the other will show as whatever the
+                model's wearing in that photo — not something you're buying. A
+                coat is entirely optional too.
+              </p>
+            </div>
+          )}
+
           {isWestern && justPickedSlot === "top" && !outfitBottom && (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-charcoal px-5 py-4 text-cream animate-fadeIn dark:bg-white/10">
               <p className="text-sm">
@@ -743,7 +854,7 @@ export default function TryOn() {
               size={size}
               modelVariant={effectiveModelVariant}
               onChangeSize={handleChangeSize}
-              onChangeModel={isWestern ? undefined : handleChangeModel}
+              onChangeModel={undefined}
               onTryOn={requestTryOn}
               onReset={handleReset}
               onDownload={handleDownload}
@@ -752,6 +863,10 @@ export default function TryOn() {
               readyToTryOn={canTryOn}
               selectedCoat={outfitCoat}
               onRemoveCoat={handleRemoveCoat}
+              category={activeCategory}
+              glbComboSrc={glbComboSrc}
+              glbTopColor={glbTopColor}
+              glbBottomColor={glbBottomColor}
             />
           </div>
         </>
