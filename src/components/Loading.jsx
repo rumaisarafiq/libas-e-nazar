@@ -18,19 +18,9 @@ const STEP_DURATION_MS = 1300;
 // progress bar. If the caller passes an explicit `message` (e.g. real
 // backend polling status), that becomes the headline and the step list
 // still runs underneath as supporting detail.
-export default function Loading({ message, subtext, countdownSeconds }) {
+export default function Loading({ message, subtext }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [progress, setProgress] = useState(6);
-  const [remaining, setRemaining] = useState(countdownSeconds);
-
-  useEffect(() => {
-    setRemaining(countdownSeconds);
-    if (!countdownSeconds) return;
-    const countdown = setInterval(() => {
-      setRemaining((r) => (r > 0 ? r - 1 : 0));
-    }, 1000);
-    return () => clearInterval(countdown);
-  }, [countdownSeconds]);
 
   useEffect(() => {
     const stepTimer = setInterval(() => {
@@ -79,12 +69,6 @@ export default function Loading({ message, subtext, countdownSeconds }) {
         <p className="mt-2 text-sm text-charcoal/50 dark:text-cream/50">
           {subtext || "This can take a moment — don't lose your patience."}
         </p>
-        {countdownSeconds != null && (
-          <p className="mt-3 font-display text-2xl tabular-nums text-gold">
-            {String(Math.floor(remaining / 60)).padStart(2, "0")}:
-            {String(remaining % 60).padStart(2, "0")}
-          </p>
-        )}
       </div>
 
       {/* Sequential step checklist */}

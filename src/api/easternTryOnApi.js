@@ -47,7 +47,6 @@ export async function submitEasternTryOn({
   guidanceScale,
   height,
   width,
-  timeoutMs,
 }) {
   if (!EASTERN_API_URL) {
     throw new Error("EASTERN_API_URL is not configured yet — see apiConfig.js");
@@ -63,29 +62,11 @@ export async function submitEasternTryOn({
   if (height != null) formData.append("height", height);
   if (width != null) formData.append("width", width);
 
-  const controller = new AbortController();
-  const timeoutId = timeoutMs
-    ? setTimeout(() => controller.abort(), timeoutMs)
-    : null;
-
-  let response;
-  try {
-    response = await fetch(`${EASTERN_API_URL}/try-on`, {
-      method: "POST",
-      headers: NGROK_HEADERS,
-      body: formData,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error(
-        "This is taking longer than expected (over 5 minutes) — the backend may be under heavy load. Please try again.",
-      );
-    }
-    throw err;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
+  const response = await fetch(`${EASTERN_API_URL}/try-on`, {
+    method: "POST",
+    headers: NGROK_HEADERS,
+    body: formData,
+  });
 
   if (!response.ok) {
     throw new Error(

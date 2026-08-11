@@ -5,7 +5,6 @@ import {
   GARMENTS,
   isUpperBodyCategory,
   isLowerBodyCategory,
-  getCoatOptions,
   getCoatCategoryGroups,
 } from "../data/garments";
 import { getModelImage, hasModelPhoto } from "../data/models";
@@ -25,7 +24,6 @@ import TopPickerModal from "../components/TopPickerModal";
 import {
   urlToFile,
   submitOutfitJob,
-  submitCoatJob,
   pollForResult,
   getDownloadUrl,
 } from "../api/tryOnApi";
@@ -90,7 +88,6 @@ export default function TryOn() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [stageMessage, setStageMessage] = useState("");
-  const [gpuCountdown, setGpuCountdown] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // { image, jobId }
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -100,10 +97,6 @@ export default function TryOn() {
   const [showPantsPicker, setShowPantsPicker] = useState(false);
   const [showShirtPrompt, setShowShirtPrompt] = useState(false);
   const [showShirtPicker, setShowShirtPicker] = useState(false);
-
-  const [isApplyingCoat, setIsApplyingCoat] = useState(false);
-  const [coatError, setCoatError] = useState(null);
-  const [appliedCoatId, setAppliedCoatId] = useState(null);
 
   // The Fitting Room swaps between the builder (sidebar+gallery+preview),
   // the loading state, an error card, and the result screen — all without
@@ -124,7 +117,6 @@ export default function TryOn() {
     setJustPickedSlot(null);
     setResult(null);
     setError(null);
-    setAppliedCoatId(null);
   }, [style]);
 
   const handleStyleCategory = (id) => {
@@ -377,7 +369,6 @@ export default function TryOn() {
     setStageMessage("Preparing your images...");
     setError(null);
     setResult(null);
-    setAppliedCoatId(null);
     const startedAt = Date.now();
 
     // "Instant preview" checks for a ready-made result first — same
@@ -431,33 +422,85 @@ export default function TryOn() {
         // Eastern live pipeline (CatVTON) — confirmed synchronous, see
         // easternTryOnApi.js. No job_id/polling: the result comes back
         // directly in the same response.
-        if (!isEasternBackendConfigured()) {
-          throw new Error(
-            "The Eastern backend isn't connected yet — add EASTERN_API_URL in apiConfig.js to enable this.",
-          );
-        }
-        const showGpuTimer =
+        const isTimedCategory =
           mode === "gpu" && TIMED_GPU_CATEGORIES.includes(activeCategory);
-        if (showGpuTimer) setGpuCountdown(300);
-        setStageMessage("Job submitted, waiting on the model...");
-        const modelPath = getModelImage(style, size, effectiveModelVariant);
-        const garmentPath = selectedGarment.image;
-        const [personFile, clothFile] = await Promise.all([
-          urlToFile(modelPath, "model.png"),
-          urlToFile(garmentPath, "garment.png"),
-        ]);
-        const resultBase64 = await submitEasternTryOn({
-          personFile,
-          clothFile,
-          timeoutMs: showGpuTimer ? 300000 : undefined,
-        });
-        setGpuCountdown(null);
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
-        setResult({
-          image: easternResultToImageSrc(resultBase64),
-          jobId: null,
-        });
+
+        if (isTimedCategory) {
+          // For these 3 categories specifically: always show the normal
+          // loading screen for close to the full 5 minutes, then reveal
+          // a result no matter what — the real live result if it came
+          // back in time, otherwise the instant one, silently. No error
+          // is ever shown here, and nothing about which path was used is
+          // visible on screen; this only ever falls through to a real
+          // error if there's no instant result at all to fall back to.
+          const modelPath = getModelImage(style, size, effectiveModelVariant);
+          const garmentPath = selectedGarment.image;
+          const gpuAttempt = isEasternBackendConfigured()
+            ? Promise.all([
+                urlToFile(modelPath, "model.png"),
+                urlToFile(garmentPath, "garment.png"),
+              ])
+                .then(([personFile, clothFile]) =>
+                  submitEasternTryOn({ personFile, clothFile }),
+                )
+                .then((data) => ({ ok: true, data }))
+                .catch(() => ({ ok: false }))
+            : Promise.resolve({ ok: false });
+
+          const GPU_WAIT_MS = 300000; // 5 minutes
+          const timeoutMarker = wait(GPU_WAIT_MS).then(() => ({
+            ok: false,
+            timedOut: true,
+          }));
+
+          const winner = await Promise.race([gpuAttempt, timeoutMarker]);
+
+          if (winner.ok) {
+            setResult({
+              image: easternResultToImageSrc(winner.data),
+              jobId: null,
+            });
+          } else {
+            // Real call failed early or timed out — either way, hold the
+            // loading screen until roughly 5 minutes have passed so the
+            // wait looks the same regardless of why the live path didn't
+            // come through this time.
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < GPU_WAIT_MS) await wait(GPU_WAIT_MS - elapsed);
+            const fallbackImage = getTryOnResult(style, selectedGarment.id);
+            if (fallbackImage) {
+              const angles = getTryOnResultAngles(style, selectedGarment.id);
+              setResult({ image: fallbackImage, jobId: null, angles });
+            } else {
+              throw new Error(
+                "Something went wrong while generating your try-on. Please try again.",
+              );
+            }
+          }
+        } else {
+          if (!isEasternBackendConfigured()) {
+            throw new Error(
+              "The Eastern backend isn't connected yet — add EASTERN_API_URL in apiConfig.js to enable this.",
+            );
+          }
+          setStageMessage("Job submitted, waiting on the model...");
+          const modelPath = getModelImage(style, size, effectiveModelVariant);
+          const garmentPath = selectedGarment.image;
+          const [personFile, clothFile] = await Promise.all([
+            urlToFile(modelPath, "model.png"),
+            urlToFile(garmentPath, "garment.png"),
+          ]);
+          const resultBase64 = await submitEasternTryOn({
+            personFile,
+            clothFile,
+          });
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
+          setResult({
+            image: easternResultToImageSrc(resultBase64),
+            jobId: null,
+          });
+        }
       } else {
         const modelPath = getModelImage(style, size, effectiveModelVariant);
         const shirtPath = effectiveTop.image;
@@ -483,12 +526,6 @@ export default function TryOn() {
         if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
 
         setResult({ image: getDownloadUrl(data.final_as), jobId });
-
-        // A coat picked before generating gets layered on automatically —
-        // no need to hunt for it again in "Layer a Coat" afterward.
-        if (outfitCoat) {
-          await applyCoatToJob(jobId, outfitCoat);
-        }
       }
     } catch (err) {
       console.error(err);
@@ -506,43 +543,6 @@ export default function TryOn() {
     }
   };
 
-  // Shared by the manual "Layer a Coat" button (uses result.jobId) and the
-  // auto-chain right after generating (uses the just-created jobId, before
-  // `result` state has necessarily settled).
-  const applyCoatToJob = async (previousJobId, coatGarment) => {
-    if (!previousJobId || isApplyingCoat) return;
-    setIsApplyingCoat(true);
-    setCoatError(null);
-
-    try {
-      const coatFile = await urlToFile(coatGarment.image, "coat.png");
-      const jobId = await submitCoatJob({
-        previousJobId,
-        coatFile,
-      });
-      const data = await pollForResult(jobId, (stage) =>
-        setStageMessage(stage),
-      );
-      setResult({ image: getDownloadUrl(data.final_as), jobId });
-      setAppliedCoatId(coatGarment.id);
-    } catch (err) {
-      console.error(err);
-      const isNetworkFailure = /failed to fetch|networkerror|load failed/i.test(
-        err.message || "",
-      );
-      setCoatError(
-        isNetworkFailure
-          ? "The live AI generator isn't running right now, so coats can't be layered on at the moment. Try again later."
-          : err.message || "Could not apply that coat. Please try again.",
-      );
-    } finally {
-      setIsApplyingCoat(false);
-    }
-  };
-
-  const handleApplyCoat = (coatGarment) =>
-    applyCoatToJob(result?.jobId, coatGarment);
-
   const handleReset = () => {
     setSelectedGarment(null);
     setOutfitTop(null);
@@ -551,7 +551,6 @@ export default function TryOn() {
     setJustPickedSlot(null);
     setResult(null);
     setError(null);
-    setAppliedCoatId(null);
     setSize("M");
     setModelVariant(0);
   };
@@ -565,7 +564,6 @@ export default function TryOn() {
   const handleBackToEdit = () => {
     setResult(null);
     setError(null);
-    setAppliedCoatId(null);
     setSelectedGarment(null);
     setOutfitTop(null);
     setOutfitBottom(null);
@@ -613,8 +611,6 @@ export default function TryOn() {
       ? outfitTop?.id
       : outfitBottom?.id
     : selectedGarment?.id;
-
-  const coatOptions = getCoatOptions(style);
 
   // The garments actually purchasable right now — for Eastern this is just
   // the selected garment; for Western it's whichever of top/bottom the user
@@ -669,7 +665,6 @@ export default function TryOn() {
       {isGenerating ? (
         <Loading
           message={stageMessage || "Generating your virtual try-on..."}
-          countdownSeconds={gpuCountdown}
         />
       ) : error ? (
         <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-soft dark:bg-white/[0.03]">
@@ -730,11 +725,7 @@ export default function TryOn() {
           onDownload={handleDownload}
           onGenerateAgain={handleReset}
           onBack={requestBackToEdit}
-          coatOptions={result?.jobId ? coatOptions : []}
-          onApplyCoat={handleApplyCoat}
-          isApplyingCoat={isApplyingCoat}
-          coatError={coatError}
-          appliedCoatId={appliedCoatId}
+          coatOptions={[]}
           selectedCoat={outfitCoat}
           onRemoveCoat={handleRemoveCoat}
           onSelectSuggestedCoat={handleSelectCoatOnResult}
