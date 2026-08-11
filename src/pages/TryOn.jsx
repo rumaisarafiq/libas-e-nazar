@@ -35,6 +35,12 @@ import {
   isEasternBackendConfigured,
 } from "../api/easternTryOnApi";
 
+// GPU generation for these 3 Eastern categories shows a 5-minute
+// countdown + real timeout — CatVTON inference on these tends to run
+// long enough that a visible estimate genuinely helps, unlike the
+// faster categories.
+const TIMED_GPU_CATEGORIES = ["kurta", "sherwani", "prince-coat"];
+
 const DEFAULT_TOP = GARMENTS.shirts[0];
 // The single-garment try-on photos (shirt/polo/sweatshirt tried on alone)
 // already have the model wearing white pants baked into the image itself —
@@ -84,6 +90,7 @@ export default function TryOn() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [stageMessage, setStageMessage] = useState("");
+  const [gpuCountdown, setGpuCountdown] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // { image, jobId }
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -429,6 +436,9 @@ export default function TryOn() {
             "The Eastern backend isn't connected yet — add EASTERN_API_URL in apiConfig.js to enable this.",
           );
         }
+        const showGpuTimer =
+          mode === "gpu" && TIMED_GPU_CATEGORIES.includes(activeCategory);
+        if (showGpuTimer) setGpuCountdown(300);
         setStageMessage("Job submitted, waiting on the model...");
         const modelPath = getModelImage(style, size, effectiveModelVariant);
         const garmentPath = selectedGarment.image;
@@ -439,7 +449,9 @@ export default function TryOn() {
         const resultBase64 = await submitEasternTryOn({
           personFile,
           clothFile,
+          timeoutMs: showGpuTimer ? 300000 : undefined,
         });
+        setGpuCountdown(null);
         const elapsed = Date.now() - startedAt;
         if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
         setResult({
@@ -490,6 +502,7 @@ export default function TryOn() {
       );
     } finally {
       setIsGenerating(false);
+      setGpuCountdown(null);
     }
   };
 
@@ -656,6 +669,7 @@ export default function TryOn() {
       {isGenerating ? (
         <Loading
           message={stageMessage || "Generating your virtual try-on..."}
+          countdownSeconds={gpuCountdown}
         />
       ) : error ? (
         <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-soft dark:bg-white/[0.03]">
