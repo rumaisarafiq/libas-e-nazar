@@ -29,9 +29,9 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-md text-balance font-body text-base leading-relaxed text-charcoal/70 dark:text-cream/70">
-            See yourself in Eastern and Western menswear before you buy. Our
-            system uses pose estimation and computer vision to render garments
-            on a realistic model, instantly and accurately.
+            See yourself in Eastern and Western menswear before you buy. Try on
+            any outfit, instantly, and see exactly how it looks before it's
+            yours.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
