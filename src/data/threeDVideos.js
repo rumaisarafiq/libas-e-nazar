@@ -9,11 +9,11 @@
 // Corduroy Pants have no 3D video at all, so the toggle simply won't
 // appear for those.
 export const THREE_D_VIDEOS = {
-  "prince-coat": "/models3d/prince-coat.mp4",
-  kurta: "/models3d/kurta-pajama.mp4",
-  "kurta-pajama": "/models3d/kurta-pajama.mp4",
-  "shalwar-kameez": "/models3d/shalwar-kameez.mp4",
-  sherwani: "/models3d/sherwani.mp4",
+  "prince-coat": "/models3d/prince-coat-metallic.mp4",
+  kurta: "/models3d/kurta-pajama-metallic.mp4",
+  "kurta-pajama": "/models3d/kurta-pajama-metallic.mp4",
+  "shalwar-kameez": "/models3d/shalwar-kameez-metallic.mp4",
+  sherwani: "/models3d/sherwani-metallic.mp4",
   shirts: "/models3d/shirts.mp4",
   "polo-shirts": "/models3d/polo.mp4",
   sweatshirts: "/models3d/sweatshirt.mp4",
