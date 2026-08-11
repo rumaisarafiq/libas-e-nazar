@@ -18,6 +18,7 @@ import ModelPreview from "../components/ModelPreview";
 import Loading from "../components/Loading";
 import ResultScreen from "../components/ResultScreen";
 import ConfirmModal from "../components/ConfirmModal";
+import GenerationModeModal from "../components/GenerationModeModal";
 import CoatPickerModal from "../components/CoatPickerModal";
 import PantsPickerModal from "../components/PantsPickerModal";
 import TopPickerModal from "../components/TopPickerModal";
@@ -28,6 +29,11 @@ import {
   pollForResult,
   getDownloadUrl,
 } from "../api/tryOnApi";
+import {
+  submitEasternTryOn,
+  easternResultToImageSrc,
+  isEasternBackendConfigured,
+} from "../api/easternTryOnApi";
 
 const DEFAULT_TOP = GARMENTS.shirts[0];
 // The single-garment try-on photos (shirt/polo/sweatshirt tried on alone)
@@ -357,7 +363,7 @@ export default function TryOn() {
     setShowConfirmModal(true);
   };
 
-  const runTryOn = async () => {
+  const runTryOn = async (mode = "instant") => {
     setShowConfirmModal(false);
     if (!canTryOn || isGenerating) return;
     setIsGenerating(true);
@@ -367,99 +373,110 @@ export default function TryOn() {
     setAppliedCoatId(null);
     const startedAt = Date.now();
 
-    // Eastern-wear garments that already have a pre-generated AI try-on
-    // result (see src/data/tryOnResults.js) skip the live backend entirely
-    // and show the saved result instantly. Western outfits (top+bottom
-    // pairs) and anything not yet connected fall through to the live
-    // pipeline below.
-    if (!isWestern && selectedGarment) {
-      const preGenerated = getTryOnResult(style, selectedGarment.id);
-      if (preGenerated) {
-        const angles = getTryOnResultAngles(style, selectedGarment.id);
-        setStageMessage("Bringing your look to life...");
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
-        setResult({ image: preGenerated, jobId: null, angles });
-        setIsGenerating(false);
-        return;
+    // "Instant preview" checks for a ready-made result first — same
+    // behavior as before this feature existed. "Live GPU generation"
+    // skips this entirely and always goes to the real pipeline below,
+    // even for combinations that do have a ready-made result, since the
+    // whole point of picking GPU mode is to see the live pipeline run.
+    if (mode === "instant") {
+      if (!isWestern && selectedGarment) {
+        const preGenerated = getTryOnResult(style, selectedGarment.id);
+        if (preGenerated) {
+          const angles = getTryOnResultAngles(style, selectedGarment.id);
+          setStageMessage("Bringing your look to life...");
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
+          setResult({ image: preGenerated, jobId: null, angles });
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      if (isWestern) {
+        let preGeneratedWestern = null;
+        if (outfitTop && outfitBottom) {
+          preGeneratedWestern =
+            getWesternTryOnResult(outfitTop.id, outfitBottom.id) ||
+            getWesternTryOnResult(outfitTop.id, null) ||
+            getWesternTryOnResult(null, outfitBottom.id);
+        } else if (outfitTop) {
+          preGeneratedWestern = getWesternTryOnResult(outfitTop.id, null);
+        } else if (outfitBottom) {
+          preGeneratedWestern =
+            getWesternTryOnResult(null, outfitBottom.id) ||
+            getWesternTryOnResult(DEFAULT_TOP.id, outfitBottom.id);
+        }
+        if (preGeneratedWestern) {
+          setStageMessage("Bringing your look to life...");
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
+          setResult({ image: preGeneratedWestern, jobId: null });
+          setIsGenerating(false);
+          return;
+        }
       }
     }
 
-    // Western outfits: check for a pre-generated shirt/polo (+ pants)
-    // combo photo before falling back to the live pipeline (see
-    // src/data/westernTryOnResults.js — note the Polo matching there is a
-    // best-guess pending your confirmation).
-    //
-    // Uses the person's ACTUAL picks (outfitTop/outfitBottom), not the
-    // defaulted effectiveTop/effectiveBottom — otherwise picking just a top
-    // would always get silently paired with pants-01 and there'd be no way
-    // to see (or buy) a true single-item look.
-    if (isWestern) {
-      let preGeneratedWestern = null;
-      if (outfitTop && outfitBottom) {
-        // Both explicitly picked: prefer the exact combo, but not every
-        // top has been paired with every pair of pants — if that specific
-        // combo doesn't exist, fall back to whichever piece has its own
-        // solo photo (top first, since that's usually the more distinctive
-        // piece) rather than failing outright. The person still gets a
-        // real photo of what they picked instead of an error.
-        preGeneratedWestern =
-          getWesternTryOnResult(outfitTop.id, outfitBottom.id) ||
-          getWesternTryOnResult(outfitTop.id, null) ||
-          getWesternTryOnResult(null, outfitBottom.id);
-      } else if (outfitTop) {
-        // Top only: show the top on its own, not paired with a default.
-        preGeneratedWestern = getWesternTryOnResult(outfitTop.id, null);
-      } else if (outfitBottom) {
-        // Bottom only: show the pants on their own if a solo photo exists
-        // for them; otherwise fall back to pairing with the default top,
-        // same as the live pipeline would.
-        preGeneratedWestern =
-          getWesternTryOnResult(null, outfitBottom.id) ||
-          getWesternTryOnResult(DEFAULT_TOP.id, outfitBottom.id);
-      }
-      if (preGeneratedWestern) {
-        setStageMessage("Bringing your look to life...");
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
-        setResult({ image: preGeneratedWestern, jobId: null });
-        setIsGenerating(false);
-        return;
-      }
-    }
-
+    // Live pipeline — reached either because mode === "gpu" (always), or
+    // mode === "instant" found nothing ready-made for this combination.
     try {
-      const modelPath = getModelImage(style, size, effectiveModelVariant);
-      const shirtPath = isWestern ? effectiveTop.image : selectedGarment.image;
-      const trouserPath = isWestern
-        ? effectiveBottom.image
-        : DEFAULT_BOTTOM.image;
+      if (!isWestern) {
+        // Eastern live pipeline (CatVTON) — confirmed synchronous, see
+        // easternTryOnApi.js. No job_id/polling: the result comes back
+        // directly in the same response.
+        if (!isEasternBackendConfigured()) {
+          throw new Error(
+            "The Eastern backend isn't connected yet — add EASTERN_API_URL in apiConfig.js to enable this.",
+          );
+        }
+        setStageMessage("Job submitted, waiting on the model...");
+        const modelPath = getModelImage(style, size, effectiveModelVariant);
+        const garmentPath = selectedGarment.image;
+        const [personFile, clothFile] = await Promise.all([
+          urlToFile(modelPath, "model.png"),
+          urlToFile(garmentPath, "garment.png"),
+        ]);
+        const resultBase64 = await submitEasternTryOn({
+          personFile,
+          clothFile,
+        });
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
+        setResult({
+          image: easternResultToImageSrc(resultBase64),
+          jobId: null,
+        });
+      } else {
+        const modelPath = getModelImage(style, size, effectiveModelVariant);
+        const shirtPath = effectiveTop.image;
+        const trouserPath = effectiveBottom.image;
 
-      const [modelFile, shirtFile, trouserFile] = await Promise.all([
-        urlToFile(modelPath, "model.png"),
-        urlToFile(shirtPath, "shirt.png"),
-        urlToFile(trouserPath, "trouser.png"),
-      ]);
+        const [modelFile, shirtFile, trouserFile] = await Promise.all([
+          urlToFile(modelPath, "model.png"),
+          urlToFile(shirtPath, "shirt.png"),
+          urlToFile(trouserPath, "trouser.png"),
+        ]);
 
-      const jobId = await submitOutfitJob({
-        modelFile,
-        shirtFile,
-        trouserFile,
-      });
-      setStageMessage("Job submitted, waiting on the model...");
-      const data = await pollForResult(jobId, (stage) =>
-        setStageMessage(stage),
-      );
+        const jobId = await submitOutfitJob({
+          modelFile,
+          shirtFile,
+          trouserFile,
+        });
+        setStageMessage("Job submitted, waiting on the model...");
+        const data = await pollForResult(jobId, (stage) =>
+          setStageMessage(stage),
+        );
 
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < MIN_LOADING_MS) await wait(MIN_LOADING_MS - elapsed);
 
-      setResult({ image: getDownloadUrl(data.final_as), jobId });
+        setResult({ image: getDownloadUrl(data.final_as), jobId });
 
-      // A coat picked before generating gets layered on automatically —
-      // no need to hunt for it again in "Layer a Coat" afterward.
-      if (outfitCoat) {
-        await applyCoatToJob(jobId, outfitCoat);
+        // A coat picked before generating gets layered on automatically —
+        // no need to hunt for it again in "Layer a Coat" afterward.
+        if (outfitCoat) {
+          await applyCoatToJob(jobId, outfitCoat);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -921,13 +938,11 @@ export default function TryOn() {
         onClose={handleCoatPickerSkip}
       />
 
-      <ConfirmModal
+      <GenerationModeModal
         open={showConfirmModal}
-        title="Try on these selected items?"
-        description="We'll generate your virtual try-on with everything you've picked so far."
-        confirmLabel="Yes"
-        cancelLabel="Cancel"
-        onConfirm={runTryOn}
+        gpuAvailable={isWestern || isEasternBackendConfigured()}
+        onSelectInstant={() => runTryOn("instant")}
+        onSelectGPU={() => runTryOn("gpu")}
         onCancel={() => setShowConfirmModal(false)}
       />
 
