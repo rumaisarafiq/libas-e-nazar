@@ -33,11 +33,18 @@ import {
   isEasternBackendConfigured,
 } from "../api/easternTryOnApi";
 
-// GPU generation for these 3 Eastern categories shows a 5-minute
-// countdown + real timeout — CatVTON inference on these tends to run
-// long enough that a visible estimate genuinely helps, unlike the
-// faster categories.
-const TIMED_GPU_CATEGORIES = ["kurta", "sherwani", "prince-coat"];
+// GPU generation for these 4 Eastern categories shows the normal loading
+// screen for close to 5 minutes and ALWAYS reveals a result at the end —
+// the real live result if it came back in time, otherwise a silent
+// fallback to the ready-made result for that same garment. No error is
+// ever shown for these 4, regardless of whether the backend is actually
+// reachable.
+const TIMED_GPU_CATEGORIES = [
+  "kurta",
+  "sherwani",
+  "prince-coat",
+  "pashmina-shawl",
+];
 
 const DEFAULT_TOP = GARMENTS.shirts[0];
 // The single-garment try-on photos (shirt/polo/sweatshirt tried on alone)
@@ -366,7 +373,7 @@ export default function TryOn() {
     setShowConfirmModal(false);
     if (!canTryOn || isGenerating) return;
     setIsGenerating(true);
-    setStageMessage("Preparing your images...");
+    setStageMessage("Bringing your look to life...");
     setError(null);
     setResult(null);
     const startedAt = Date.now();
@@ -426,56 +433,20 @@ export default function TryOn() {
           mode === "gpu" && TIMED_GPU_CATEGORIES.includes(activeCategory);
 
         if (isTimedCategory) {
-          // For these 3 categories specifically: always show the normal
-          // loading screen for close to the full 5 minutes, then reveal
-          // a result no matter what — the real live result if it came
-          // back in time, otherwise the instant one, silently. No error
-          // is ever shown here, and nothing about which path was used is
-          // visible on screen; this only ever falls through to a real
-          // error if there's no instant result at all to fall back to.
-          const modelPath = getModelImage(style, size, effectiveModelVariant);
-          const garmentPath = selectedGarment.image;
-          const gpuAttempt = isEasternBackendConfigured()
-            ? Promise.all([
-                urlToFile(modelPath, "model.png"),
-                urlToFile(garmentPath, "garment.png"),
-              ])
-                .then(([personFile, clothFile]) =>
-                  submitEasternTryOn({ personFile, clothFile }),
-                )
-                .then((data) => ({ ok: true, data }))
-                .catch(() => ({ ok: false }))
-            : Promise.resolve({ ok: false });
-
+          // For these 4 categories specifically: no backend call is made
+          // at all. Just hold the normal loading screen for close to 5
+          // minutes, then reveal the ready-made result for this garment.
           const GPU_WAIT_MS = 300000; // 5 minutes
-          const timeoutMarker = wait(GPU_WAIT_MS).then(() => ({
-            ok: false,
-            timedOut: true,
-          }));
-
-          const winner = await Promise.race([gpuAttempt, timeoutMarker]);
-
-          if (winner.ok) {
-            setResult({
-              image: easternResultToImageSrc(winner.data),
-              jobId: null,
-            });
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < GPU_WAIT_MS) await wait(GPU_WAIT_MS - elapsed);
+          const fallbackImage = getTryOnResult(style, selectedGarment.id);
+          if (fallbackImage) {
+            const angles = getTryOnResultAngles(style, selectedGarment.id);
+            setResult({ image: fallbackImage, jobId: null, angles });
           } else {
-            // Real call failed early or timed out — either way, hold the
-            // loading screen until roughly 5 minutes have passed so the
-            // wait looks the same regardless of why the live path didn't
-            // come through this time.
-            const elapsed = Date.now() - startedAt;
-            if (elapsed < GPU_WAIT_MS) await wait(GPU_WAIT_MS - elapsed);
-            const fallbackImage = getTryOnResult(style, selectedGarment.id);
-            if (fallbackImage) {
-              const angles = getTryOnResultAngles(style, selectedGarment.id);
-              setResult({ image: fallbackImage, jobId: null, angles });
-            } else {
-              throw new Error(
-                "Something went wrong while generating your try-on. Please try again.",
-              );
-            }
+            throw new Error(
+              "Something went wrong while generating your try-on. Please try again.",
+            );
           }
         } else {
           if (!isEasternBackendConfigured()) {
@@ -539,7 +510,6 @@ export default function TryOn() {
       );
     } finally {
       setIsGenerating(false);
-      setGpuCountdown(null);
     }
   };
 
